@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathForge · 练习台</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">MathForge<span class="dot">.</span></div>
+  <span class="tape">记忆驱动的数学训练 Agent</span>
+  <div class="spacer"></div>
+  <button id="theme-btn" title="纸感 / 暗色引擎双主题">🌗 主题</button>
+  <a href="/strategy-board" target="_blank" style="font-size:13px;text-decoration:none">策略台 ↗</a>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab on" data-pane="pane-bank">🗂 题库直刷</button>
+  <button class="tab" data-pane="pane-practice">✏️ 练习台</button>
+  <button class="tab" data-pane="pane-review" id="tab-review">📅 今日复习</button>
+</nav>
+
+<div class="subtitle-bar">
+  <span class="cap-no" id="cap-no">字幕</span>
+  <span class="cap-text" id="cap-text">把讲义变成「出题 → 自测 → 归因 → 薄弱点 → 变式」的闭环</span>
+</div>
+
+<!-- ═══════════ 页签一：题库直刷（默认主入口 · Day6） ═══════════ -->
+<div id="pane-bank" class="pane">
+<main class="layout">
+  <section>
+    <div class="card review-banner" id="review-banner-bank" style="display:none">
+      📅 今日复习 <b id="rbank-n">0</b> 项待巩固（半衰期 7 天模型）
+      <button class="accent" onclick="gotoReview()">去复习 →</button>
+    </div>
+    <div class="card">
+      <h3>🗂 题库筛选 <span class="muted">cxyonly 真题 128 道 · 数据不出本地 · 难度字段缺失不设难度筛选</span></h3>
+      <div class="filter-grid">
+        <select id="bf-subject"><option value="">科目：全部</option></select>
+        <select id="bf-year"><option value="">年份：全部</option></select>
+        <select id="bf-qtype"><option value="">题型：全部</option></select>
+        <select id="bf-kproot"><option value="">知识板块：全部</option></select>
+        <select id="bf-kp"><option value="">知识点：全部</option></select>
+      </div>
+      <div class="answer-row" style="margin-top:10px">
+        <button class="primary" id="bf-apply">应用筛选</button>
+        <button id="bf-clear">清空</button>
+        <span class="muted" id="bf-count"></span>
+      </div>
+      <div id="bank-list"></div>
+    </div>
+
+    <div class="card qcard" id="bank-qcard" style="display:none">
+      <h3>✏️ 直刷 <span class="muted" id="bank-prog"></span></h3>
+      <div class="qmeta" id="bank-q-meta"></div>
+      <div class="statement" id="bank-q-statement"></div>
+      <div id="bank-options-row"></div>
+      <div class="solution-zone" id="bank-solution-zone" style="display:none">
+        <div class="pen-hint">📝 解答题不做机器判分：先在纸上完整作答，再对照标准解析自评（真实备考工作流）。</div>
+        <details id="bank-solution-details">
+          <summary>展开标准解析（默认折叠防瞄）</summary>
+          <div class="solution-ans"><b>标准答案：</b><span id="bank-q-answer"></span></div>
+          <div class="solution-ana"><b>解析：</b><span id="bank-q-analysis"></span></div>
+        </details>
+        <textarea id="bank-paste-in" placeholder="可选：粘贴你的作答/思路，供 AI 四类归因参考（自评档位不受影响）" style="width:100%;min-height:56px;font-size:12.5px;margin-top:8px"></textarea>
+        <div class="override-row" id="bank-self-row"></div>
+      </div>
+      <div class="verdict" id="bank-verdict"></div>
+      <div class="answer-row" id="bank-next-row" style="display:none">
+        <button class="primary" id="bank-next-btn">下一题 ▶</button>
+        <button class="accent" id="bank-similar-btn">🔁 推荐同类</button>
+        <button class="accent" id="bank-variant-btn" style="display:none">🧬 出变式</button>
+        <button id="bank-quit-btn">结束连刷</button>
+      </div>
+    </div>
+
+    <div class="card attr-card" id="bank-attr-card">
+      <h3>🔍 错题归因 <span class="muted">四类归因（与练习台同一体系）· 已入记忆</span></h3>
+      <div class="attr-llm">归因判定：<span class="attr-label" id="bank-attr-label">—</span>
+        <span class="muted" id="bank-attr-note">（AI 评估供参考）</span></div>
+      <div class="override-row" id="bank-override-row">
+        <span class="muted" style="align-self:center">不是这个原因？修正标签（写入记忆系统）：</span>
+      </div>
+      <div class="muted" id="bank-override-note" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h3>🎯 策略台 <span class="muted">为什么给你这道题</span></h3>
+      <div id="bank-decision-box"><span class="muted">作答后这里显示下一步策略决策：触发规则 / 记忆快照 / 理由。</span></div>
+    </div>
+    <div class="card">
+      <h3>📊 薄弱点面板 <span class="muted">与练习台共用同一记忆系统 · 半衰期 7 天</span></h3>
+      <div id="bank-mastery-box"><span class="muted">暂无作答记录</span></div>
+    </div>
+    <div class="card">
+      <h3>🧾 本次连刷</h3>
+      <div id="bank-stats-box"><span class="muted">尚未开始</span></div>
+    </div>
+  </aside>
+</main>
+</div>
+
+<!-- ═══════════ 页签二：练习台（既有策略出题流） ═══════════ -->
+<div id="pane-practice" class="pane" hidden>
+<main class="layout">
+  <!-- 左：练习流 -->
+  <section>
+    <div class="card review-banner" id="review-banner-practice" style="display:none">
+      📅 今日复习 <b id="rpractice-n">0</b> 项待巩固（半衰期 7 天模型）
+      <button class="accent" onclick="gotoReview()">去复习 →</button>
+    </div>
+    <div class="card">
+      <h3>📄 讲义摄取 <span class="muted">POST /ingest · MD/PDF/图片 → 知识点结构化</span></h3>
+      <div class="ingest-area">
+        <div class="answer-row">
+          <input type="file" id="file-in" accept=".md,.markdown,.txt" style="padding:6px">
+          <button class="primary" id="ingest-btn">摄取</button>
+          <span class="muted">Markdown / TXT（选文件自动载入）</span>
+        </div>
+        <div class="answer-row">
+          <span class="muted">演示讲义：</span>
+          <button class="demo-load" data-src="demo_assets/高数-微分中值定理.md">高数·微分中值定理</button>
+          <button class="demo-load" data-src="demo_assets/线代-矩阵运算与逆矩阵.md">线代·矩阵与逆矩阵</button>
+        </div>
+        <textarea id="md-in" placeholder="粘贴 Markdown/LaTeX 讲义，或选择上方演示讲义…"></textarea>
+        <div class="upload-divider">── 文件上传通道 ──</div>
+        <div class="answer-row">
+          <label class="up-file">📄 PDF 上传 <span class="muted">主通道 · 本地抽文本零 API</span>
+            <input type="file" id="pdf-in" accept=".pdf"></label>
+          <label class="up-file">🖼 图片上传 <span class="muted">实验通道 · VLM</span>
+            <input type="file" id="img-in" accept=".png,.jpg,.jpeg"></label>
+        </div>
+      </div>
+      <div id="ingest-result" style="display:none"></div>
+      <div class="kp-chips" id="kp-chips"><span class="muted">摄取后知识点在此出现，点击选择练习知识点</span></div>
+      <div class="answer-row" style="margin-top:10px">
+        <span class="muted">出题模式：</span>
+        <select id="gen-mode">
+          <option value="calculation">计算题 · 机器判分</option>
+          <option value="solution">解答题 · 自评对照（纸笔工作流）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card qcard" id="qcard">
+      <h3>✏️ 题目 <span class="muted" id="q-source">GET /generate · 未过验证的题绝不外推</span></h3>
+      <div class="qmeta" id="q-meta"><span class="chip">尚未出题</span></div>
+      <div class="statement empty" id="q-statement">选择知识点后点击「出题」——策略引擎会根据你的记忆状态决定题型与难度。</div>
+      <div class="answer-row" id="answer-row" style="display:none">
+        <input id="ans-in" placeholder="输入答案（支持 1/2、sqrt(2)、0.5 等）" style="display:none">
+        <button class="primary" id="submit-btn">提交判分</button>
+      </div>
+      <div id="options-row" style="display:none"></div>
+      <div class="solution-zone" id="sol-zone" style="display:none">
+        <div class="pen-hint">📝 解答题自评对照（真实备考工作流）：先在纸上完整作答，再展开标准解析对照自评——不做机器判分。</div>
+        <details id="sol-details">
+          <summary>展开标准解析（默认折叠防瞄）</summary>
+          <div class="solution-ans"><b>标准答案：</b><span id="sol-answer"></span></div>
+          <div class="solution-ana"><b>解析：</b><span id="sol-analysis"></span></div>
+        </details>
+        <div class="override-row" id="sol-self-row"></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <div class="answer-row" id="variant-launch-row" style="display:none">
+        <button class="accent" id="variant-btn">🔁 出变式（针对这道错题）</button>
+        <span class="muted">变式与源错题同库入记忆，策略联动</span>
+      </div>
+      <div id="variant-box" style="display:none"></div>
+    </div>
+
+    <div class="card attr-card" id="attr-card">
+      <h3>🔍 错题归因 <span class="muted">LLM 四类归因 · attribution_override 人工修正闭环</span></h3>
+      <div class="attr-llm">LLM 判定：<span class="attr-label" id="attr-label">—</span>
+        <span class="attr-conf" id="attr-conf"></span></div>
+      <div class="attr-reason" id="attr-reason"></div>
+      <div class="override-row" id="override-row">
+        <span class="muted" style="align-self:center">不是这个原因？修正标签（写入记忆系统）：</span>
+      </div>
+      <div class="muted" id="override-note" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- 右：策略台 -->
+  <aside>
+    <div class="card">
+      <h3>🎯 策略台 <span class="muted">为什么出这道题</span></h3>
+      <div id="decision-box"><span class="muted">出题后这里显示决策：触发规则 / 记忆快照 / 理由。</span></div>
+    </div>
+    <div class="card">
+      <h3>📊 薄弱点面板 <span class="muted">GET /mastery · 半衰期 7 天</span></h3>
+      <div id="mastery-box"><span class="muted">暂无作答记录</span></div>
+    </div>
+    <div class="card">
+      <h3>🧾 决策时间线 <span class="muted">GET /policy-log</span></h3>
+      <div id="timeline-box"><span class="muted">暂无决策</span></div>
+    </div>
+  </aside>
+</main>
+</div>
+
+<!-- ═══════════ 页签三：今日复习 + 遗忘可视化（Day6 任务 3） ═══════════ -->
+<div id="pane-review" class="pane" hidden>
+<main class="layout">
+  <section>
+    <div class="card">
+      <h3>📅 今日复习 <span class="muted">掌握度低 × 距上次久优先 · 半衰期 7 天模型 · 刷完清单自动变化</span></h3>
+      <div id="review-list"><span class="muted">加载中…</span></div>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h3>🧠 遗忘模型说明</h3>
+      <div class="muted">掌握度按半衰期 7 天衰减：mastery × 0.5^(经过天数/7)。清单按「遗忘后掌握度 ↑ × 距上次练习 ↓」排序；建议动作与策略规则语言一致（基础回炉 / 概念变式 / 重练+变式 / 重练）。</div>
+      <div class="muted" style="margin-top:10px">迷你折线 = 该知识点掌握度随策略决策记录的演化（数据源：policy_log 记忆快照 + 当前值）。</div>
+    </div>
+    <div class="card">
+      <h3>🎯 联动说明</h3>
+      <div class="muted">「按清单出题」跳转练习台按该 kp 出题（策略引擎接管难度选择）；题库直刷产生的错题归因也会实时反映到本清单。</div>
+    </div>
+  </aside>
+</main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const API = location.protocol.startsWith("http") ? "" : "http://127.0.0.1:8127";
+const $ = (id) => document.getElementById(id);
+let currentQ = null;
+let lastAnswered = null;   // 最近一次判分结果（归因修正用）
+let caps = [];
+let capIdx = 0;
+
+/* ---------- 基础 ---------- */
+function toast(msg, ms = 2600) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+async function jget(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`GET ${path} → ${r.status}`);
+  return r.json();
+}
+async function jpost(path, body) {
+  const r = await fetch(API + path, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`POST ${path} → ${r.status} ${t.slice(0, 120)}`);
+  }
+  return r.json();
+}
+
+/* ---------- KaTeX（$...$ 行内渲染，vendor 本地化） ---------- */
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function tex(el, raw) {
+  const text = String(raw ?? "");
+  const parts = text.split(/(\$[^$]+\$)/g);
+  el.innerHTML = "";
+  for (const p of parts) {
+    if (p.startsWith("$") && p.endsWith("$") && p.length > 2) {
+      const span = document.createElement("span");
+      el.appendChild(span);
+      if (window.katex) {
+        try { katex.render(p.slice(1, -1), span, { throwOnError: false }); continue; } catch (e) { /* fallthrough */ }
+      }
+      span.textContent = p;
+    } else if (p) {
+      el.appendChild(document.createTextNode(p));
+    }
+  }
+}
+
+/* ---------- 字幕条轮播 ---------- */
+async function loadCaptions() {
+  try {
+    const d = await (await fetch("captions.json")).json();
+    caps = d.captions || [];
+  } catch (e) { caps = []; }
+  if (caps.length) {
+    const c = caps[0];
+    $("cap-no").textContent = `${c.id.toUpperCase()} · ${c.t}`;
+    $("cap-text").textContent = c.text;
+    setInterval(() => {
+      capIdx = (capIdx + 1) % caps.length;
+      const c = caps[capIdx];
+      $("cap-no").textContent = `${c.id.toUpperCase()} · ${c.t}`;
+      $("cap-text").textContent = c.text;
+    }, 5000);
+  }
+}
+
+/* ---------- 主题 ---------- */
+$("theme-btn").onclick = () => {
+  const h = document.documentElement;
+  const next = h.dataset.theme === "engine" ? "paper" : "engine";
+  h.dataset.theme = next;
+  localStorage.setItem("mf-theme", next);
+};
+if (localStorage.getItem("mf-theme")) document.documentElement.dataset.theme = localStorage.getItem("mf-theme");
+
+/* ---------- 摄取 ---------- */
+let ingestSource = "";
+document.querySelectorAll(".demo-load").forEach(b => b.onclick = async () => {
+  try {
+    const r = await fetch(b.dataset.src);
+    $("md-in").value = await r.text();
+    ingestSource = b.dataset.src.split("/").pop();  // 与缓存键一致（源文件名），DEMO=1 才能复演
+    toast("演示讲义已载入，点击「摄取」");
+  } catch (e) { toast("讲义载入失败：" + e.message); }
+});
+$("file-in").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (f) { $("md-in").value = await f.text(); ingestSource = f.name; }
+};
+$("ingest-btn").onclick = async () => {
+  const md = $("md-in").value;          // 原样发送（缓存键逐字对齐，勿 trim：尾换行也参与键）
+  if (!md.trim()) return toast("请先载入讲义内容");
+  $("ingest-btn").disabled = true;
+  try {
+    const d = await jpost("/ingest", { md, source: ingestSource || "ui-upload" });
+    const kps = (d.data && d.data.kp_list) || [];
+    const box = $("kp-chips");
+    box.innerHTML = "";
+    (d.data?.subject) && box.insertAdjacentHTML("beforeend",
+      `<span class="capsule">${esc(d.data.subject)}</span>`);
+    kps.forEach(k => {
+      const b = document.createElement("button");
+      b.className = "chip on"; b.style.cursor = "pointer";
+      b.textContent = k.kp;
+      b.onclick = () => generate(k.kp);
+      box.appendChild(b);
+    });
+    toast(`摄取完成：${kps.length} 个知识点`);
+  } catch (e) { toast("摄取失败：" + e.message, 4000); }
+  $("ingest-btn").disabled = false;
+};
+
+/* ---------- 文件摄取（Task5）：PDF 主通道 / 图片实验通道 → 结构化结果确认 ---------- */
+async function uploadIngest(file, channelLabel) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  $("ingest-btn").disabled = true;
+  try {
+    const r = await fetch(API + "/ingest-file", { method: "POST", body: fd });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`POST /ingest-file → ${r.status}`);
+    if (!d.ok) { renderIngestError(d, channelLabel); return; }
+    renderIngestResult(d, channelLabel);
+  } catch (e) { toast(`${channelLabel}摄取失败：` + e.message, 4000); }
+  $("ingest-btn").disabled = false;
+}
+$("pdf-in").onchange = (e) => { if (e.target.files[0]) uploadIngest(e.target.files[0], "📄 PDF"); e.target.value = ""; };
+$("img-in").onchange = (e) => { if (e.target.files[0]) uploadIngest(e.target.files[0], "🖼 图片"); e.target.value = ""; };
+function renderIngestResult(d, channelLabel) {
+  const box = $("ingest-result");
+  const data = d.data || {};
+  const kps = data.kp_list || [];
+  box.style.display = "block";
+  box.innerHTML = `
+    <div class="muted" style="margin-bottom:8px">${esc(channelLabel)} · 来源 <b>${esc(d.source || "")}</b> · 抽取结果如下，确认后再进入出题流</div>
+    <div class="answer-row" style="gap:6px">
+      <span class="capsule">${esc(data.subject || "科目未识别")}</span>
+      <span class="chip">${esc(data.chapter || "章未识别")}</span>
+      <span class="chip">知识点 × ${kps.length}</span>
+    </div>
+    <div style="margin-top:8px">
+      ${kps.map((k, i) => `
+        <details ${i === 0 ? "open" : ""} class="irk">
+          <summary><b>${i + 1}. ${esc(k.kp || "未命名")}</b>
+            <span class="chip">${esc(k.difficulty_ceiling || "—")}</span>
+            <span class="muted">前置：${esc((k.prerequisites || []).join("、") || "无")}</span></summary>
+          <div class="irk-body">
+            ${k.definition_md ? `<div class="irk-def"></div>` : ""}
+            ${k.key_formulas && k.key_formulas.length ? `<div class="irk-f"><b>关键公式：</b>${esc(k.key_formulas.join(" ；"))}</div>` : ""}
+            ${k.common_mistakes && k.common_mistakes.length ? `<div class="irk-f muted"><b>常见错误：</b>${esc(k.common_mistakes.join(" ；"))}</div>` : ""}
+            ${k.sympy_checks && k.sympy_checks.length ? `<div class="irk-f muted"><b>验证：</b>${esc(k.sympy_checks.join(" ；"))}</div>` : ""}
+          </div>
+        </details>`).join("")
+        || '<span class="muted">未抽取到知识点</span>'}
+    </div>
+    ${kps.length ? `<div class="answer-row" style="margin-top:10px">
+      <button class="primary" id="confirm-kps">✓ 确认知识点，进入出题流</button>
+      <span class="muted">确认后知识点落入下方练习区，点击即可出题</span>
+    </div>` : ""}`;
+  const defs = kps.map(k => k.definition_md).filter(Boolean);  // 与 .irk-def 顺序对齐
+  box.querySelectorAll(".irk-def").forEach((el, i) => tex(el, defs[i]));
+  const btn = $("confirm-kps");
+  if (btn) btn.onclick = () => confirmKps(data);
+}
+function renderIngestError(d, channelLabel) {
+  const box = $("ingest-result");
+  box.style.display = "block";
+  box.innerHTML = `<div class="verdict no" style="display:block;margin-top:0">
+    <b>${esc(channelLabel)}未完成：</b>${esc(d.message || d.error || "未知错误")}</div>
+    ${d.degraded ? `<div class="muted" style="margin-top:6px">图片为实验通道（VLM 依赖 API）。演示模式 / 未配置 key 时不可用属正常降级，可改用 PDF / MD 通道。</div>` : ""}`;
+  toast(`${channelLabel}未完成：${d.message || d.error || "未知错误"}`, 4500);
+}
+function confirmKps(data) {
+  const box = $("kp-chips");
+  box.innerHTML = "";
+  (data?.subject) && box.insertAdjacentHTML("beforeend", `<span class="capsule">${esc(data.subject)}</span>`);
+  (data?.chapter) && box.insertAdjacentHTML("beforeend", `<span class="chip">${esc(data.chapter)}</span>`);
+  (data?.kp_list || []).forEach(k => {
+    const b = document.createElement("button");
+    b.className = "chip on"; b.style.cursor = "pointer";
+    b.textContent = k.kp;
+    b.onclick = () => generate(k.kp);
+    box.appendChild(b);
+  });
+  toast(`已确认 ${(data?.kp_list || []).length} 个知识点——点击知识点即可出题`);
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/* ---------- 出题 ---------- */
+let lastDecision = null;   // 最近一次策略决策（「按策略出下一题」依据）
+function genModeQtype(fallback) {
+  // 解答题自评模式下，策略决策的计算题一律以解答题形态呈现（自评对照）
+  return $("gen-mode").value === "solution" ? "solution" : (fallback || "calculation");
+}
+async function generate(kp, qtype, difficulty) {
+  qtype = qtype || $("gen-mode").value;
+  try {
+    const d = await jget(`/generate?kp=${encodeURIComponent(kp)}&difficulty=${encodeURIComponent(difficulty || "基础")}&qtype=${qtype}`);
+    renderDecision(d.decision, "本次决策");
+    renderQuestion(d.question);
+  } catch (e) { toast("出题失败：" + e.message, 4000); }
+}
+function renderDecision(dec, label) {
+  if (!dec) return;
+  lastDecision = dec;
+  renderDecisionTo($("decision-box"), dec, label);
+}
+function renderDecisionTo(box, dec, label) {
+  if (!dec || !box) return;
+  const chips = [`难度 ${dec.difficulty}`, `× ${dec.count}`]
+    .concat(dec.plus_variant ? [`+变式 ×${dec.plus_variant}`] : [])
+    .map(c => `<span class="chip">${esc(c)}</span>`).join("");
+  box.innerHTML = `
+    <div><span class="rule-capsule">${esc(dec.trigger_rule)}</span>
+      <b style="margin-left:8px">${esc(dec.kp || "")}</b></div>
+    <div class="decision-reason">${esc(label)}：${esc(dec.reason || "")}</div>
+    <div class="decision-chips">${chips}</div>
+    ${dec.explanation ? `<div class="p6-explain" style="display:block">💡 ${esc(dec.explanation)}</div>` : ""}
+    <div style="margin-top:12px"><button class="accent" onclick="followPolicy()">▶ 按此决策出下一题</button></div>`;
+}
+function followPolicy() {
+  if (!lastDecision) return toast("暂无策略决策");
+  generate(lastDecision.kp, genModeQtype(lastDecision.qtype), lastDecision.difficulty);
+}
+function renderQuestion(q) {
+  currentQ = q;
+  lastAnswered = null;
+  $("attr-card").classList.remove("show");
+  $("verdict").className = "verdict"; $("verdict").textContent = "";
+  $("sol-zone").style.display = "none";
+  $("variant-box").style.display = "none";
+  $("variant-launch-row").style.display = "none";
+  const meta = $("q-meta");
+  if (!q.statement_md) {
+    meta.innerHTML = `<span class="badge blocked">拦截 [待人工]</span><span class="chip">${esc(q.kp)}</span>`;
+    $("q-statement").className = "statement empty";
+    $("q-statement").textContent = `该题未通过验证链，已拦截不外推。原因：${q.error || "未知"}`;
+    $("answer-row").style.display = "none";
+    $("options-row").style.display = "none";
+    return;
+  }
+  const lv = q.verify_level === "green"
+    ? '<span class="badge green">🟢 绿标 · SymPy 确定性验证</span>'
+    : '<span class="badge yellow">🟡 黄标 · 双盲自洽校验</span>';
+  meta.innerHTML = lv +
+    `<span class="chip">${esc(q.kp)}</span><span class="chip">${esc(q.difficulty)}</span>` +
+    (q.routed === "family" ? '<span class="chip">确定性模板族</span>' : "") +
+    (q.qtype ? `<span class="chip">${esc(q.qtype)}</span>` : "");
+  tex($("q-statement"), q.statement_md);
+  $("q-statement").className = "statement";
+  const opts = q.options || [];
+  const optRow = $("options-row");
+  const ansRow = $("answer-row");
+  if (opts.length) {
+    optRow.style.display = "block"; ansRow.style.display = "none";
+    optRow.innerHTML = "";
+    opts.forEach(o => {
+      const label = typeof o === "string" ? o : `${o.label ?? ""}. ${o.content_md ?? ""}`;
+      const b = document.createElement("button");
+      b.className = "option-btn"; b.textContent = label;
+      b.onclick = () => submitAnswer(label.split(".")[0].trim());
+      optRow.appendChild(b);
+    });
+  } else if (q.qtype === "concept") {
+    optRow.style.display = "block"; ansRow.style.display = "none";
+    optRow.innerHTML = "";
+    ["正确", "错误"].forEach(v => {
+      const b = document.createElement("button");
+      b.className = "option-btn"; b.textContent = v;
+      b.onclick = () => submitAnswer(v);
+      optRow.appendChild(b);
+    });
+  } else if (q.qtype === "solution") {
+    // 解答题自评对照（Day6 任务 2）：不做机器判分
+    optRow.style.display = "none"; ansRow.style.display = "none";
+    $("sol-zone").style.display = "block";
+    $("sol-details").open = false;
+    tex($("sol-answer"), q.answer_sympy ?? q.answer_md ?? "—");
+    tex($("sol-analysis"), q.analysis || "—");
+    const srow = $("sol-self-row");
+    srow.querySelectorAll("button").forEach(b => b.remove());
+    ["✅ 会", "🔶 部分会", "❌ 不会"].forEach(g => {
+      const b = document.createElement("button");
+      b.textContent = g;
+      b.onclick = () => practiceSelfAssess(g.slice(2));
+      srow.appendChild(b);
+    });
+  } else {
+    optRow.style.display = "none"; ansRow.style.display = "flex";
+    $("ans-in").style.display = "inline-block";
+    $("ans-in").value = "";
+    $("ans-in").focus();
+  }
+  if (q.variant) renderVariantBox(q);
+}
+
+/* ---------- 变式溯源（Day6 任务 4）---------- */
+function renderVariantBox(q) {
+  const v = q.variant || {};
+  const dimChips = (v.dimensions || []).map(d =>
+    `<span class="chip chip-core">${esc(d)}</span>`).join("");
+  const paramChips =
+    Object.entries(v.changed_params || {}).map(([k, c]) =>
+      `<span class="chip">${esc(k)}：${esc(String(c.from))} → ${esc(String(c.to))}</span>`).join("") +
+    Object.entries(v.introduced_params || {}).map(([k, val]) =>
+      `<span class="chip">${esc(k)} = ${esc(String(val))}（新参数格）</span>`).join("");
+  const kpLine = v.kp_consistent
+    ? `<span class="muted">✓ 知识点一致：${esc(v.source_kp)}</span>`
+    : `<span class="muted">⚠ 源「${esc(v.source_kp)}」→ 变式「${esc(q.kp)}」（跨知识点，请留意）</span>`;
+  const box = $("variant-box");
+  box.style.display = "block";
+  box.innerHTML = `<details class="card" style="margin:10px 0" open>
+    <summary><b>🧬 源题与变化</b> <span class="muted">变式溯源 · 与源错题同一记忆体系</span></summary>
+    <div class="muted" style="margin-top:6px">源错题：${esc(v.source_question_id ? v.source_question_id + " · " : "")}${esc(v.source_kp)}（难度 ${esc(v.source_difficulty || "—")}）</div>
+    <div class="statement" style="font-size:12.5px;margin:4px 0"></div>
+    <div style="margin-top:6px">变化维度：${dimChips}</div>
+    <div style="margin-top:4px">${paramChips || '<span class="muted">（结构级变化，无逐参数对照）</span>'}</div>
+    <div style="margin-top:4px">${kpLine}</div>
+  </details>`;
+  tex(box.querySelector(".statement"), v.source_statement_md || "（源题干未记录）");
+}
+async function requestVariant(srcQ) {
+  if (!srcQ || !srcQ.kp) return toast("先出题");
+  try {
+    const d = await jpost("/variant", {
+      kp: srcQ.kp,
+      source_statement_md: srcQ.statement_md || "",
+      source_params: srcQ.params || {},
+      source_kp: srcQ.kp,
+      source_question_id: srcQ.id ?? srcQ.question_id ?? null,
+      source_difficulty: srcQ.difficulty || "基础",
+      source_qtype: srcQ.qtype || null,
+    });
+    document.querySelector('[data-pane="pane-practice"]').click();
+    renderQuestion(d.question);
+    $("qcard").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!d.question.statement_md) {
+      toast("变式未通过验证链已拦截（演示模式缓存未预热时属正常降级，不出网）", 4500);
+    }
+  } catch (e) { toast("变式出题失败：" + e.message, 4000); }
+}
+$("variant-btn").onclick = () => requestVariant(currentQ);
+$("bank-variant-btn").onclick = () => requestVariant(bankCurrent);
+
+/* ---------- 判分 + 归因 ---------- */
+$("submit-btn").onclick = () => submitAnswer($("ans-in").value.trim());
+async function practiceSelfAssess(grade) {
+  // 解答题自评（Day6 任务 2）：三档自评 → 记忆 → 策略决策（与题库流同一记忆系统）
+  const q = currentQ;
+  if (!q || !q.statement_md) return toast("先出题");
+  try {
+    const d = await jpost("/bank/self-assess", {
+      kp: q.kp, statement_md: q.statement_md, grade,
+      standard_answer: q.answer_sympy ?? q.answer_md ?? "",
+      analysis: q.analysis || null, current_difficulty: q.difficulty || "基础",
+    });
+    const v = $("verdict");
+    if (grade === "会") {
+      v.className = "verdict ok";
+      v.textContent = "✅ 自评「会」——已写入记忆（掌握度 +）";
+    } else {
+      v.className = "verdict no";
+      v.textContent = `${grade === "部分会" ? "🔶" : "❌"} 自评「${grade}」——已记入错题本与记忆，复习清单将出现该知识点`;
+      $("variant-launch-row").style.display = "flex";
+      showAttribution(q, grade, d, true);
+    }
+    if (d.next) renderDecision(d.next, "下一步决策");
+    refreshState();
+  } catch (e) { toast("自评失败：" + e.message, 4000); }
+}
+async function submitAnswer(student) {
+  if (!currentQ || !currentQ.statement_md) return toast("先出题");
+  if (!student) return toast("请输入答案");
+  const q = currentQ;
+  $("submit-btn").disabled = true;
+  try {
+    const body = {
+      kp: q.kp, statement_md: q.statement_md, student_answer: student,
+      standard_answer: q.answer_sympy ?? q.answer_md ?? q.correct ?? "",
+      verify_level: q.verify_level || "green",
+      options: q.options || null, correct: q.correct ?? null,
+      current_difficulty: q.difficulty || "基础", analysis: q.analysis || null,
+    };
+    const d = await jpost("/answer", body);
+    const v = $("verdict");
+    if (d.correct) {
+      v.className = "verdict ok";
+      v.textContent = "✅ 回答正确，已写入记忆（掌握度 +）";
+      $("attr-card").classList.remove("show");
+    } else {
+      v.className = "verdict no";
+      v.textContent = "❌ 回答错误";
+      $("variant-launch-row").style.display = "flex";
+      showAttribution(q, student, d);
+    }
+    lastAnswered = { q, student, d, selfAssess: false };
+    if (d.next) renderDecision(d.next, "下一步决策");
+    refreshState();
+  } catch (e) { toast("判分失败：" + e.message, 4000); }
+  $("submit-btn").disabled = false;
+}
+function showAttribution(q, student, d, selfAssess = false) {
+  lastAnswered = { q, student, d, selfAssess };
+  $("attr-card").classList.add("show");
+  $("attr-label").textContent = d.attribution || "—";
+  $("attr-conf").textContent = "";
+  $("attr-reason").textContent = "四类：概念混淆 / 计算失误 / 方法选错 / 审题错误。修正后写入记忆，策略随真实错因联动。";
+  const row = $("override-row");
+  row.querySelectorAll("button").forEach(b => b.remove());
+  ["概念混淆", "计算失误", "方法选错", "审题错误"].forEach(label => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (label === d.attribution) b.classList.add("on");
+    b.onclick = () => overrideAttribution(label);
+    row.appendChild(b);
+  });
+  $("override-note").textContent = "";
+}
+async function overrideAttribution(label) {
+  if (!lastAnswered) return;
+  const { q, student } = lastAnswered;
+  if (lastAnswered.selfAssess) {
+    // 解答题自评的归因修正：写记忆、不重复计分（Day6 任务 2）
+    try {
+      await jpost("/bank/fix-attribution", { kp: q.kp, attribution: label });
+      $("override-note").textContent = `✔ 归因已修正为「${label}」并写入记忆（修正即闭环，不重复计分）。`;
+      refreshState();
+    } catch (e) { toast("修正失败：" + e.message, 4000); }
+    return;
+  }
+  try {
+    const d = await jpost("/answer", {
+      kp: q.kp, statement_md: q.statement_md, student_answer: student,
+      standard_answer: q.answer_sympy ?? q.answer_md ?? q.correct ?? "",
+      verify_level: q.verify_level || "green", options: q.options || null,
+      correct: q.correct ?? null, current_difficulty: q.difficulty || "基础",
+      analysis: q.analysis || null, attribution_override: label,
+    });
+    $("override-note").textContent = `✔ 归因已修正为「${label}」并写入记忆（修正即闭环）。下一步：${d.next?.trigger_rule || "—"} ${d.next?.reason || ""}`;
+    renderDecision(d.next, "修正后下一步");
+    refreshState();
+  } catch (e) { toast("修正失败：" + e.message, 4000); }
+}
+
+/* ---------- 状态刷新 ---------- */
+async function refreshState() {
+  try {
+    const m = await jget("/mastery");
+    const rows = (m.mastery || []).sort((a, b) => a.mastery_decayed - b.mastery_decayed);
+    $("mastery-box").innerHTML = rows.length
+      ? rows.map(r => {
+          const pct = Math.round((r.mastery_decayed ?? 0) * 100);
+          return `<div class="mrow"><span title="${esc(r.kp)}">${esc(r.kp)}</span>
+            <div class="mbar"><i style="width:${pct}%"></i></div><span class="mpct">${pct}%</span></div>`;
+        }).join("")
+      : '<span class="muted">暂无作答记录</span>';
+  } catch (e) { /* 静默 */ }
+  loadReviewBanner();
+  try {
+    const p = await jget("/policy-log?limit=6");
+    $("timeline-box").innerHTML = (p.log || []).map(l => `
+      <div class="tl-item">
+        <span class="tl-rule">${esc(l.trigger_rule)}</span>
+        <span>${esc(l.output?.kp || "")} · ${esc(l.output?.difficulty || "")} ×${l.output?.count ?? 1}
+          <span class="muted">${esc((l.output?.reason || "").slice(0, 30))}</span></span>
+      </div>`).join("") || '<span class="muted">暂无决策</span>';
+  } catch (e) { /* 静默 */ }
+}
+
+/* ---------- 页签切换 ---------- */
+document.querySelectorAll("#tabs .tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll("#tabs .tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.hidden = p.id !== t.dataset.pane);
+  if (t.dataset.pane === "pane-bank" && !bankFacets) loadBankFacets();
+  if (t.dataset.pane === "pane-review" && typeof loadReview === "function") loadReview();
+});
+
+/* ---------- 题库直刷（Day6 任务 1/2）---------- */
+let bankFacets = null;
+let bankList = [];        // 当前筛选结果
+let bankQueue = [], bankIdx = 0, bankStats = null;
+let bankCurrent = null;   // 当前正在刷的题
+
+async function loadBankFacets() {
+  try {
+    const d = await jget("/bank/facets");
+    bankFacets = d.facets;
+    const fill = (sel, items, labelFn) => {
+      sel.querySelectorAll("option:not(:first-child)").forEach(o => o.remove());
+      items.forEach(it => {
+        const o = document.createElement("option");
+        o.value = it.v; o.textContent = labelFn(it);
+        sel.appendChild(o);
+      });
+    };
+    fill($("bf-subject"), bankFacets.subjects, it => `${it.v}（${it.n}）`);
+    fill($("bf-year"), bankFacets.years, it => `${it.v}（${it.n}）`);
+    fill($("bf-qtype"), bankFacets.qtypes, it => `${it.label}（${it.n}）`);
+    fill($("bf-kproot"), bankFacets.kp_roots, it => `${it.v}（${it.n}）`);
+    fillKp();
+  } catch (e) { toast("题库加载失败：" + e.message, 4000); }
+}
+function fillKp() {
+  const root = $("bf-kproot").value;
+  const sel = $("bf-kp");
+  sel.querySelectorAll("option:not(:first-child)").forEach(o => o.remove());
+  (bankFacets?.kps || []).filter(k => !root || k.root === root).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k.v; o.textContent = `${k.v}（${k.n}）`;
+    sel.appendChild(o);
+  });
+}
+$("bf-kproot").onchange = fillKp;
+$("bf-clear").onclick = () => {
+  ["bf-subject", "bf-year", "bf-qtype", "bf-kproot", "bf-kp"].forEach(id => $(id).value = "");
+  fillKp(); applyBankFilter();
+};
+$("bf-apply").onclick = applyBankFilter;
+async function applyBankFilter() {
+  const p = new URLSearchParams();
+  if ($("bf-subject").value) p.set("subject", $("bf-subject").value);
+  if ($("bf-year").value) p.set("year", $("bf-year").value);
+  if ($("bf-qtype").value) p.set("qtype", $("bf-qtype").value);
+  if ($("bf-kp").value) p.set("kp", $("bf-kp").value);
+  else if ($("bf-kproot").value) p.set("kp_root", $("bf-kproot").value);
+  try {
+    const d = await jget("/bank/questions?" + p.toString());
+    bankList = d.questions || [];
+    renderBankList();
+  } catch (e) { toast("筛选失败：" + e.message, 4000); }
+}
+function renderBankList() {
+  $("bf-count").textContent = `共 ${bankList.length} 题` + (bankList.length ? " · 可单刷或连刷" : "");
+  const el = $("bank-list");
+  const show = bankList.slice(0, 30);
+  el.innerHTML = show.map(q => `
+    <div class="bitem">
+      <div class="bitem-meta">
+        <span class="chip ${q.qtype === "solution" ? "chip-sol" : ""}">${q.qtype === "choice" ? "选择题" : "解答题"}</span>
+        <span class="chip">${esc(q.subject)}</span>
+        <span class="chip">${q.year ?? "未标注"}</span>
+        <span class="chip" title="${esc(q.kp)}">${esc(q.kp_root)}</span>
+        ${q.is_core ? '<span class="chip chip-core">核心</span>' : ""}
+        <span class="muted">${esc(q.id)}</span>
+      </div>
+      <div class="bitem-stem"></div>
+      <div class="answer-row">
+        <button class="accent" data-id="${esc(q.id)}">刷这道</button>
+      </div>
+    </div>`).join("")
+    + (bankList.length > 30 ? `<div class="muted" style="margin-top:8px">…仅展示前 30 题（共 ${bankList.length} 题），可用「连刷这批」顺序完成后自动进入后续题目</div>` : "")
+    + (bankList.length ? '<div class="answer-row" style="margin-top:10px"><button class="primary" id="bf-session">▶ 连刷这批（最多 20 题）</button></div>' : '<div class="muted">筛选结果为空</div>');
+  el.querySelectorAll(".bitem").forEach((item, i) => tex(item.querySelector(".bitem-stem"), show[i].statement_md));
+  el.querySelectorAll("button[data-id]").forEach(b => b.onclick = () => {
+    startBankSession([bankList.find(q => q.id === b.dataset.id)]);
+  });
+  const bs = $("bf-session");
+  if (bs) bs.onclick = () => startBankSession(bankList.slice(0, 20));
+}
+
+function startBankSession(queue) {
+  if (!queue.length) return toast("筛选结果为空");
+  bankQueue = queue.filter(Boolean);
+  bankIdx = 0;
+  bankStats = { done: 0, correct: 0, wrong: 0 };
+  $("bank-qcard").style.display = "block";
+  $("bank-qcard").scrollIntoView({ behavior: "smooth", block: "start" });
+  renderBankQ();
+}
+function renderBankQ() {
+  const q = bankQueue[bankIdx];
+  bankCurrent = q;
+  $("bank-attr-card").classList.remove("show");
+  $("bank-verdict").className = "verdict"; $("bank-verdict").textContent = "";
+  $("bank-next-row").style.display = "none";
+  $("bank-prog").textContent = `第 ${bankIdx + 1} / ${bankQueue.length} 题 · 已对 ${bankStats.correct} · 错 ${bankStats.wrong}`;
+  $("bank-q-meta").innerHTML =
+    `<span class="chip ${q.qtype === "solution" ? "chip-sol" : ""}">${q.qtype === "choice" ? "选择题" : "解答题"}</span>` +
+    `<span class="chip">${esc(q.subject)}</span><span class="chip">${q.year ?? "未标注"}</span>` +
+    `<span class="chip" title="${esc(q.kp)}">${esc(q.kp)}</span><span class="muted">${esc(q.id)}</span>`;
+  tex($("bank-q-statement"), q.statement_md);
+  const optRow = $("bank-options-row"), solZone = $("bank-solution-zone");
+  const selfRow = $("bank-self-row");
+  selfRow.querySelectorAll("button").forEach(b => b.remove());
+  if (q.qtype === "choice") {
+    optRow.style.display = "block"; solZone.style.display = "none";
+    optRow.innerHTML = "";
+    (q.options || []).forEach(o => {
+      const b = document.createElement("button");
+      b.className = "option-btn";
+      tex(b, `${o.label}. ${o.content_md}`);
+      b.onclick = () => bankSubmitChoice(o.label);
+      optRow.appendChild(b);
+    });
+  } else {
+    optRow.style.display = "none"; solZone.style.display = "block";
+    $("bank-solution-details").open = false;
+    $("bank-paste-in").value = "";
+    tex($("bank-q-answer"), q.answer || "—");
+    tex($("bank-q-analysis"), q.analysis || "—");
+    ["✅ 会", "🔶 部分会", "❌ 不会"].forEach(g => {
+      const b = document.createElement("button");
+      b.textContent = g;
+      b.onclick = () => bankSelfAssess(g.slice(2));
+      selfRow.appendChild(b);
+    });
+  }
+  bankStatsBox();
+}
+function bankStatsBox() {
+  const s = bankStats;
+  $("bank-stats-box").innerHTML = s
+    ? `已刷 <b>${s.done}</b> · 对 <b style="color:var(--green)">${s.correct}</b> · 错 <b style="color:var(--bad)">${s.wrong}</b>` +
+      (s.done ? ` · 正确率 ${Math.round(s.correct / s.done * 100)}%` : "") +
+      `<div class="muted" style="margin-top:6px">错题已归因入记忆，薄弱点自动驱动练习台策略出题。</div>`
+    : '<span class="muted">尚未开始</span>';
+}
+async function bankAfterAnswer(q, d, correct) {
+  bankStats.done++; correct ? bankStats.correct++ : bankStats.wrong++;
+  bankStatsBox();
+  const v = $("bank-verdict");
+  if (correct) {
+    v.className = "verdict ok";
+    v.textContent = "✅ 回答正确，已写入记忆（掌握度 +）";
+  } else {
+    v.className = "verdict no";
+    v.textContent = "❌ 回答错误——已归因并写入记忆，薄弱点将驱动后续出题";
+    showBankAttribution(q, d.attribution);
+  }
+  if (d.next) renderDecisionTo($("bank-decision-box"), d.next, "下一步决策");
+  $("bank-variant-btn").style.display = correct ? "none" : "inline-block";
+  $("bank-next-row").style.display = "flex";
+  bankRefreshMastery();
+}
+async function bankSubmitChoice(label) {
+  const q = bankCurrent;
+  const opt = (q.options || []).find(o => o.label === label);
+  const ansOpt = (q.options || []).find(o => o.label === q.answer);
+  try {
+    const d = await jpost("/bank/answer", {
+      kp: q.kp, statement_md: q.statement_md, student_answer: label, answer: q.answer,
+      question_id: q.id,
+      student_answer_md: opt ? `${label}. ${opt.content_md}` : label,
+      answer_md: ansOpt ? `${q.answer}. ${ansOpt.content_md}` : q.answer,
+      analysis: q.analysis, current_difficulty: "进阶",
+    });
+    bankAfterAnswer(q, d, d.correct);
+  } catch (e) { toast("判分失败：" + e.message, 4000); }
+}
+async function bankSelfAssess(grade) {
+  const q = bankCurrent;
+  try {
+    const d = await jpost("/bank/self-assess", {
+      kp: q.kp, statement_md: q.statement_md, grade, question_id: q.id,
+      standard_answer: q.answer, analysis: q.analysis, current_difficulty: "进阶",
+      student_answer: $("bank-paste-in").value.trim() || null,
+    });
+    const v = $("bank-verdict");
+    if (grade === "会") {
+      v.className = "verdict ok";
+      v.textContent = "✅ 自评「会」——已写入记忆（掌握度 +）";
+    } else {
+      v.className = "verdict no";
+      v.textContent = `${grade === "部分会" ? "🔶" : "❌"} 自评「${grade}」——已记入错题本与记忆，复习清单将出现该知识点`;
+    }
+    if (d.attribution || $("bank-paste-in").value.trim()) showBankAttribution(q, d.attribution);
+    if (d.next) renderDecisionTo($("bank-decision-box"), d.next, "下一步决策");
+    bankStats.done++; d.correct ? bankStats.correct++ : bankStats.wrong++;
+    bankStatsBox();
+    $("bank-variant-btn").style.display = d.correct ? "none" : "inline-block";
+    $("bank-next-row").style.display = "flex";
+    bankRefreshMastery();
+  } catch (e) { toast("自评失败：" + e.message, 4000); }
+}
+function showBankAttribution(q, label) {
+  $("bank-attr-card").classList.add("show");
+  $("bank-attr-label").textContent = label || "—（未归因）";
+  $("bank-attr-note").textContent = label ? "（AI 评估供参考）" : "（可人工补选标签写入记忆）";
+  const row = $("bank-override-row");
+  row.querySelectorAll("button").forEach(b => b.remove());
+  ["概念混淆", "计算失误", "方法选错", "审题错误"].forEach(l => {
+    const b = document.createElement("button");
+    b.textContent = l;
+    if (l === label) b.classList.add("on");
+    b.onclick = () => bankFixAttribution(l);
+    row.appendChild(b);
+  });
+  $("bank-override-note").textContent = "";
+}
+async function bankFixAttribution(label) {
+  try {
+    await jpost("/bank/fix-attribution", { kp: bankCurrent.kp, attribution: label });
+    $("bank-attr-label").textContent = label;
+    $("bank-override-note").textContent = `✔ 归因已修正为「${label}」并写入记忆（修正即闭环，不重复计分）。`;
+    bankRefreshMastery();
+  } catch (e) { toast("修正失败：" + e.message, 4000); }
+}
+$("bank-next-btn").onclick = () => {
+  bankIdx++;
+  if (bankIdx >= bankQueue.length) {
+    const s = bankStats;
+    toast(`本轮连刷完成：${s.done} 题 · 对 ${s.correct} · 错 ${s.wrong}。错题已入记忆，可去「练习台」定向补弱。`, 5000);
+    $("bank-qcard").style.display = "none";
+    return;
+  }
+  renderBankQ();
+};
+$("bank-similar-btn").onclick = async () => {
+  const q = bankCurrent;
+  try {
+    const d = await jget(`/bank/similar?kp=${encodeURIComponent(q.kp)}&exclude_id=${encodeURIComponent(q.id)}`);
+    if (!(d.questions || []).length) return toast("题库中没有同类题了");
+    startBankSession(d.questions);
+    toast(`已切换到同类题连刷（${d.questions.length} 题）`);
+  } catch (e) { toast("推荐失败：" + e.message, 4000); }
+};
+$("bank-quit-btn").onclick = () => { $("bank-qcard").style.display = "none"; };
+async function bankRefreshMastery() {
+  try {
+    const m = await jget("/mastery");
+    const rows = (m.mastery || []).sort((a, b) => a.mastery_decayed - b.mastery_decayed);
+    $("bank-mastery-box").innerHTML = rows.length
+      ? rows.map(r => {
+          const pct = Math.round((r.mastery_decayed ?? 0) * 100);
+          return `<div class="mrow"><span title="${esc(r.kp)}">${esc(r.kp)}</span>
+            <div class="mbar"><i style="width:${pct}%"></i></div><span class="mpct">${pct}%</span></div>`;
+        }).join("")
+      : '<span class="muted">暂无作答记录</span>';
+  } catch (e) { /* 静默 */ }
+  loadReviewBanner();
+}
+
+/* ---------- 今日复习 + 遗忘可视化（Day6 任务 3）---------- */
+function gotoReview() { document.querySelector('[data-pane="pane-review"]').click(); }
+async function loadReviewBanner() {
+  try {
+    const d = await jget("/review/today?limit=99");
+    const n = (d.items || []).length;
+    ["bank", "practice"].forEach(k => {
+      const b = $(`review-banner-${k}`);
+      if (!b) return;
+      b.style.display = n ? "block" : "none";
+      $(`r${k}-n`).textContent = n;
+    });
+  } catch (e) { /* 静默 */ }
+}
+function sparkSVG(pts) {
+  if (!pts || pts.length < 2) return '<span class="muted">暂无演化数据</span>';
+  const w = 130, h = 38, pad = 3;
+  const tmin = pts[0].t, tmax = pts[pts.length - 1].t, span = Math.max(tmax - tmin, 1);
+  const xy = pts.map(p => [pad + (p.t - tmin) / span * (w - 2 * pad), h - pad - p.v * (h - 2 * pad)]);
+  const poly = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const last = xy[xy.length - 1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="掌握度遗忘曲线">
+    <polyline points="${poly}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="var(--accent)"/></svg>`;
+}
+async function loadReview() {
+  try {
+    const d = await jget("/review/today?limit=20");
+    const items = d.items || [];
+    const el = $("review-list");
+    if (!items.length) {
+      el.innerHTML = '<div class="muted">暂无待复习项——刚练过的知识点记忆尚新。去「题库直刷」练几题，错题归因后会自动进入本清单。</div>';
+      return;
+    }
+    el.innerHTML = "";
+    for (const it of items) {
+      let spark = "";
+      try {
+        const h = await jget(`/review/history?kp=${encodeURIComponent(it.kp)}`);
+        spark = sparkSVG(h.points);
+      } catch (e) { spark = ""; }
+      const div = document.createElement("div");
+      div.className = "ritem";
+      div.innerHTML = `
+        <div class="ritem-head">
+          <b title="${esc(it.kp)}">${esc(it.kp)}</b>
+          <span class="chip chip-action">${esc(it.suggestion)}</span>
+        </div>
+        <div class="muted">${esc(it.reason)}</div>
+        <div class="ritem-row">
+          <div class="mbar"><i style="width:${Math.round(it.mastery_decayed * 100)}%"></i></div>
+          <span class="mpct">${Math.round(it.mastery_decayed * 100)}%</span>
+          ${spark}
+          <button class="accent" data-kp="${esc(it.kp)}">按清单出题 ▶</button>
+        </div>`;
+      div.querySelector("button").onclick = () => practiceFromReview(it.kp);
+      el.appendChild(div);
+    }
+    loadReviewBanner();
+  } catch (e) { $("review-list").innerHTML = `<span class="muted">加载失败：${esc(e.message)}</span>`; }
+}
+function practiceFromReview(kp) {
+  document.querySelector('[data-pane="pane-practice"]').click();
+  generate(kp, genModeQtype("calculation"), "基础");
+}
+
+/* ---------- boot ---------- */
+loadCaptions();
+refreshState();
+loadBankFacets();
+loadReviewBanner();
+</script>
+</body>
+</html>

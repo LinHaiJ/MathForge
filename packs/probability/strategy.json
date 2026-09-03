@@ -1,0 +1,5 @@
+{
+  "mastery": { "window": 5, "difficulty_weight": 1.0 },
+  "policy_flags": { "prob_confirm_before_family": true },
+  "maturity": "experimental"
+}

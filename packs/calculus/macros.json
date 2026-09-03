@@ -1,0 +1,53 @@
+[
+  {
+    "id": "macro.frac",
+    "name": "分式",
+    "trigger": "a/b",
+    "template": "\\frac{}{}",
+    "scope": "all",
+    "note": "输入 a/b 后 Tab 填入分子分母"
+  },
+  {
+    "id": "macro.sup",
+    "name": "上标",
+    "trigger": "a^2",
+    "template": "^{}",
+    "scope": "all"
+  },
+  {
+    "id": "macro.sub",
+    "name": "下标",
+    "trigger": "a_1",
+    "template": "_{}",
+    "scope": "all"
+  },
+  {
+    "id": "macro.sum",
+    "name": "求和",
+    "trigger": "sum",
+    "template": "\\sum_{i=1}^{n}",
+    "scope": "all"
+  },
+  {
+    "id": "macro.lim",
+    "name": "极限",
+    "trigger": "lim",
+    "template": "\\lim_{x \\to 0}",
+    "scope": "all"
+  },
+  {
+    "id": "macro.partial",
+    "name": "偏导",
+    "trigger": "pd",
+    "template": "\\frac{\\partial}{\\partial x}",
+    "scope": "calculus"
+  },
+  {
+    "id": "macro.matrix",
+    "name": "矩阵块",
+    "trigger": "mat",
+    "template": "mat(3,3, 1,2,3 | 4,5,6 | 7,8,9)",
+    "scope": "linear",
+    "note": "由矩阵尺寸选择器生成 DSL 块"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "id": "math1",
+  "name": "考研数学一",
+  "packs": [
+    { "id": "calculus", "weight": 0.56, "exam_scope": "全部章节" },
+    { "id": "linear", "weight": 0.22, "exam_scope": "全部章节" },
+    { "id": "probability", "weight": 0.22, "exam_scope": "全部章节" }
+  ],
+  "paper_structure": {
+    "total": 150,
+    "single_choice": { "count": 10, "points": 5 },
+    "fill": { "count": 6, "points": 5 },
+    "solution": { "count": 6, "points_total": 70 }
+  },
+  "score_anchor": 100
+}

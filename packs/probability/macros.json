@@ -1,0 +1,6 @@
+[
+  { "id": "macro.prob", "name": "概率 P", "trigger": "P", "template": "P(A)", "scope": "probability" },
+  { "id": "macro.cond", "name": "条件概率", "trigger": "cond", "template": "P(A \\mid B)", "scope": "probability" },
+  { "id": "macro.expect", "name": "期望", "trigger": "E", "template": "E(X)", "scope": "probability" },
+  { "id": "macro.var", "name": "方差", "trigger": "Var", "template": "D(X)", "scope": "probability" }
+]

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathForge v2 · 今日</title>
+<link rel="stylesheet" href="/ui/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/ui2/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">MathForge <span class="ver">v2</span></div>
+  <span class="sim-badge" id="simBadge" hidden>模拟数据</span>
+  <div class="spacer"></div>
+  <nav class="page-switch" id="pageSwitch">
+    <button class="ps on" data-page="today">今日</button>
+    <button class="ps" data-page="facts">足迹统计</button>
+  </nav>
+  <div class="checkin" id="checkin" title="今日打卡（本地连续天数）"></div>
+</header>
+
+<main>
+  <!-- ============ 页 A 今日 ============ -->
+  <section id="view-today" class="page on">
+    <div class="intent-bar">
+      <input id="intent-input" type="text" maxlength="120"
+             placeholder="说一句要练的：如「来一道进阶的拉格朗日」（只做变式出题）"
+             autocomplete="off">
+      <button id="intent-go" class="primary">出题</button>
+      <div id="intent-hint" class="hint" hidden></div>
+    </div>
+
+    <!-- 复习清单（练习入口）：按 高数/线代/概率 分类可筛；卡片按掌握度最低在前 -->
+    <div class="subj-filter" id="subjFilter">
+      <button class="sf on" data-f="">全部</button>
+      <button class="sf" data-f="calculus">高数</button>
+      <button class="sf" data-f="linear">线代</button>
+      <button class="sf" data-f="probability">概率</button>
+    </div>
+    <div id="review-list" class="cards"></div>
+
+    <!-- 出题卡（同页展开）：源题溯源区 + 题目 + 作答 -->
+    <div id="practice" class="practice" hidden>
+      <div class="provenance" id="provenance"></div>
+      <div class="qmeta" id="q-meta"></div>
+      <div class="statement" id="q-statement"></div>
+
+      <div id="fill-area">
+        <div class="row">
+          <input id="latex-input" type="text" maxlength="400"
+                 placeholder="输入你的答案（LaTeX 或普通文本，如 pi/2、Rational(1,2)）">
+          <button id="submit-answer" class="primary">提交</button>
+        </div>
+        <div class="preview" id="preview"></div>
+      </div>
+
+      <div id="sol-area" hidden>
+        <details id="sol-analysis"><summary>标准解答（作答后再展开对照）</summary>
+          <div id="sol-answer"></div>
+        </details>
+        <div class="grade-row">
+          <span class="lbl">自评：</span>
+          <button class="grade-btn" data-g="会">会</button>
+          <button class="grade-btn" data-g="部分会">部分会</button>
+          <button class="grade-btn" data-g="不会">不会</button>
+        </div>
+      </div>
+
+      <div id="result-area" hidden></div>
+      <div class="row-end"><button id="new-turn" class="ghost" hidden>再练一题</button>
+        <button id="close-practice" class="ghost">收起来，回清单</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 页 B 足迹统计（单页滚动，只读） ============ -->
+  <section id="view-facts" class="page">
+    <h2>足迹</h2>
+    <div id="heatmap-wrap"></div>
+    <div class="detail-box">
+      <h3>当日明细</h3>
+      <div id="daily-list" class="mini"></div>
+    </div>
+    <h2>掌握度分布</h2>
+    <div id="mastery-dist" class="bars"></div>
+    <h2>错因分布</h2>
+    <div id="attr-dist" class="bars"></div>
+    <h2>薄弱模式</h2>
+    <div id="patterns" class="mini"></div>
+    <details id="timeline-box"><summary>策略时间线（只读）</summary>
+      <div id="timeline" class="mini"></div>
+    </details>
+  </section>
+</main>
+
+<footer class="foot">MathForge v2 · 交互形态参考 summer-checkin（MIT）</footer>
+
+<script src="/ui/vendor/katex/katex.min.js"></script>
+<script src="/ui2/app.js"></script>
+</body>
+</html>

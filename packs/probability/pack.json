@@ -1,0 +1,17 @@
+{
+  "id": "probability",
+  "name": "概率论与数理统计",
+  "version": "0.2.0",
+  "description": "考研数学一·概率统计科目包。语料最薄（6268 全量下 214 题），experimental 主导——蒸馏规格与域段证据量小，S6 重点观察域（D026）",
+  "entry": {
+    "syllabus": "kp_graph.json",
+    "qtypes": "qtypes.json",
+    "examiner": "examiner/SKILL.md",
+    "families": "families",
+    "macros": "macros.json",
+    "strategy": "strategy.json"
+  },
+  "verify": { "engine": "sympy", "pack_validators": [] },
+  "requires_core": ">=2.0.0",
+  "maturity": "experimental"
+}

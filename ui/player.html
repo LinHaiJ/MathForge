@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathForge · auto-demo 播放器</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+
+  #stage { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  /* 引擎段：整屏暗色 */
+  body.seg-engine { --bg: #0f0f12; --bg2: #16161c; --card: #1b1b22; --ink: #f2f2ee; --ink2: #9a9aa6;
+    --line: #2b2b35; --accent: #8b7cf6; --accent-soft: rgba(139,124,246,.16); --green: #4fd1c5;
+    --blue: #7cb1f0; --bad: #f27059; --shadow: 0 2px 14px rgba(0,0,0,.45); }
+
+  #content { flex: 1; display: flex; align-items: center; justify-content: center; padding: 4vh 5vw; overflow: hidden; position: relative; }
+  .panel { width: 100%; max-width: 1100px; display: none; }
+  .panel.show { display: block; animation: rise .5s ease both; }
+
+  /* 字幕两档：大字居中 / 角标小字 */
+  #cap-main { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    text-align: center; font-family: var(--serif); font-weight: 700; pointer-events: none; z-index: 5; }
+  #cap-main.l1 { font-size: clamp(28px, 4.6vw, 58px); line-height: 1.45; letter-spacing: 1px; }
+  #cap-main.l2 { font-size: clamp(15px, 1.6vw, 22px); color: var(--ink2); font-weight: 500; margin-top: 1.2vh; }
+  #cap-corner { position: absolute; left: 5vw; bottom: 9vh; font-family: var(--serif);
+    font-size: clamp(15px, 1.7vw, 24px); color: var(--ink); z-index: 5; pointer-events: none; }
+  #cap-corner .tag { color: var(--accent); font-family: var(--mono); font-weight: 700; margin-right: 10px; }
+
+  /* 品牌段 */
+  .brand-panel { text-align: center; }
+  .brand-title { font-family: var(--serif); font-size: clamp(40px, 7vw, 92px); font-weight: 700; letter-spacing: 2px; }
+  .brand-title em { font-style: normal; color: var(--accent); }
+  .brand-sub { font-family: var(--serif); font-size: clamp(16px, 2vw, 26px); color: var(--ink2); margin-top: 2.4vh; }
+  .layer-chips { display: flex; gap: 14px; justify-content: center; margin-top: 4.5vh; flex-wrap: wrap; }
+  .layer-chips .capsule { font-size: clamp(13px, 1.3vw, 17px); padding: 8px 22px; }
+  .layer-chips .arrow { align-self: center; color: var(--ink2); font-family: var(--mono); }
+
+  /* 引擎段通用面板头 */
+  .panel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 2.4vh; }
+  .panel-head .capsule { font-size: clamp(12px, 1.2vw, 15px); }
+  .panel-head .file { font-family: var(--mono); color: var(--ink2); font-size: clamp(12px, 1.2vw, 15px); }
+
+  .kp-fly { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 2vh; }
+  .kp-fly .chip { font-size: clamp(14px, 1.5vw, 20px); padding: 8px 20px; opacity: 0; animation: rise .5s ease both; }
+
+  .demo-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 2vw; align-items: start; }
+  @media (max-width: 860px) { .demo-grid { grid-template-columns: 1fr; } }
+  .demo-grid .statement { font-size: clamp(15px, 1.6vw, 22px); }
+
+  .attr-demo { border-left: 4px solid var(--bad); padding-left: 16px; margin-top: 2.2vh;
+    font-size: clamp(14px, 1.5vw, 20px); }
+  .attr-demo .lbl { font-weight: 750; color: var(--bad); font-size: 1.25em; }
+  .attr-demo .conf { font-family: var(--mono); color: var(--ink2); font-size: .8em; margin-left: 8px; }
+  .attr-demo .fix { margin-top: 1.2vh; color: var(--accent); }
+  .strike { text-decoration: line-through; color: var(--ink2); }
+
+  .mrow { font-size: clamp(13px, 1.4vw, 18px); }
+  .mrow .kp-name { font-size: 1em; }
+
+  /* 评测 count-up */
+  .eval-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.6vw; }
+  @media (max-width: 860px) { .eval-grid { grid-template-columns: repeat(2, 1fr); } }
+  .eval-cell { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 2.4vh 1.4vw; text-align: center; box-shadow: var(--shadow); }
+  .eval-cell .num { font-family: var(--mono); font-size: clamp(26px, 3.6vw, 52px); font-weight: 700; color: var(--green); }
+  .eval-cell .lbl { font-size: clamp(12px, 1.2vw, 15px); color: var(--ink2); margin-top: .8vh; }
+  .eval-cell .ci { font-family: var(--mono); font-size: clamp(10px, 1vw, 13px); color: var(--ink2); }
+  .eval-evo { margin-top: 3vh; }
+  .eval-evo .erow { display: grid; grid-template-columns: 3.2em 1fr 4.2em; gap: 12px; align-items: center; margin: 1vh 0; font-size: clamp(12px, 1.3vw, 16px); }
+  .eval-evo .ebar { height: 12px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .eval-evo .ebar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 999px; width: 0; transition: width 1.1s ease; }
+  .src-note { margin-top: 2.2vh; font-size: clamp(10px, 1vw, 13px); color: var(--ink2); font-family: var(--mono); }
+
+  /* 终端卡 */
+  .terminal { background: #0b0b0e; border: 1px solid #2b2b35; border-radius: 12px; padding: 2.4vh 1.8vw;
+    font-family: var(--mono); font-size: clamp(11px, 1.25vw, 16px); line-height: 1.85; color: #c8e6c9;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); min-height: 40vh; }
+  .terminal .t-cmd { color: #8b7cf6; }
+  .terminal .t-ok { color: #4fd1c5; }
+  .terminal .t-dim { color: #666; }
+  .terminal .t-line { white-space: pre-wrap; word-break: break-all; }
+
+  /* HUD */
+  #hud { position: fixed; top: 14px; right: 16px; z-index: 20; display: flex; gap: 8px; align-items: center; }
+  #hud button { background: rgba(127,127,127,.12); border-color: var(--line); font-size: 12.5px; padding: 5px 14px; }
+  #hud .stepno { font-family: var(--mono); font-size: 12px; color: var(--ink2); margin-right: 4px; }
+  #progress { position: fixed; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(127,127,127,.18); z-index: 20; }
+  #progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+  #brandmark { position: fixed; left: 18px; top: 14px; font-family: var(--serif); font-weight: 700; font-size: 15px; z-index: 20; opacity: .8; }
+</style>
+</head>
+<body class="seg-paper">
+
+<div id="stage">
+  <div id="brandmark">MathForge<span style="color:var(--accent)">.</span> auto-demo</div>
+  <div id="hud">
+    <span class="stepno" id="stepno">0/0</span>
+    <button id="play-btn">⏸ 暂停</button>
+    <button id="replay-btn">↺ 重放</button>
+  </div>
+
+  <div id="content">
+    <div id="cap-main" style="display:none"></div>
+    <div id="cap-corner" style="display:none"></div>
+
+    <!-- 品牌段 -->
+    <div class="panel brand-panel" id="p-brand">
+      <div class="brand-title">Math<em>Forge</em></div>
+      <div class="brand-sub">把讲义变成「出题 → 自测 → 归因 → 薄弱点 → 变式」的闭环</div>
+    </div>
+    <div class="panel brand-panel" id="p-layers">
+      <div class="layer-chips">
+        <span class="capsule">规则引擎 · 管调度</span><span class="arrow">→</span>
+        <span class="capsule">LLM · 管生成理解</span><span class="arrow">→</span>
+        <span class="capsule">SymPy · 管验证</span>
+      </div>
+      <div class="brand-sub" style="margin-top:4vh">三层分工：正确性责任从 LLM 移到验证层</div>
+    </div>
+
+    <!-- 引擎段面板 -->
+    <div class="panel" id="p-ingest">
+      <div class="panel-head"><span class="capsule">摄取</span><span class="file">POST /ingest · 高数-微分中值定理.md</span></div>
+      <div class="kp-fly" id="ingest-kps"></div>
+      <div class="muted" style="margin-top:3vh;font-size:clamp(12px,1.2vw,15px)">LaTeX 保真 · 知识点 = 可独立出题的最小单元 · 前置关系入图</div>
+    </div>
+
+    <div class="panel" id="p-q">
+      <div class="panel-head"><span class="capsule" id="q-rule">P2</span><span class="file" id="q-reason"></span></div>
+      <div class="demo-grid">
+        <div>
+          <div class="qmeta" id="q-meta"></div>
+          <div class="statement" id="q-statement"></div>
+        </div>
+        <div class="card" style="background:var(--card)">
+          <div class="muted">策略台 · 为什么是这道题</div>
+          <div class="decision-reason" id="q-side-reason"></div>
+          <div class="decision-chips" id="q-side-chips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-attr">
+      <div class="panel-head"><span class="capsule">判分 + 归因</span><span class="file">POST /answer · LLM 四类归因</span></div>
+      <div class="demo-grid">
+        <div>
+          <div class="verdict no" style="display:block">❌ 学生答案：999</div>
+          <div class="attr-demo" id="attr-box"></div>
+        </div>
+        <div class="card" style="background:var(--card)">
+          <div class="muted">记忆系统</div>
+          <div class="decision-reason" id="attr-mem"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-policy">
+      <div class="panel-head"><span class="capsule" id="po-rule">P4</span><span class="file" id="po-file"></span></div>
+      <div class="demo-grid">
+        <div><div class="qmeta" id="po-meta"></div><div class="statement" id="po-statement"></div></div>
+        <div class="card" style="background:var(--card)">
+          <div class="muted" id="po-side-lbl">策略联动</div>
+          <div class="decision-reason" id="po-side-reason"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-mastery">
+      <div class="panel-head"><span class="capsule">薄弱点面板</span><span class="file">GET /mastery · 半衰期 7 天衰减</span></div>
+      <div id="mastery-box"></div>
+    </div>
+
+    <div class="panel" id="p-eval">
+      <div class="panel-head"><span class="capsule">评测体系</span><span class="file">四指标 × Wilson CI × 五轮迭代</span></div>
+      <div class="eval-grid">
+        <div class="eval-cell"><div class="num" data-target="90" data-suffix="%">0%</div>
+          <div class="lbl">M1 出题成功率</div><div class="ci">CI95 [0.70, 0.97]</div></div>
+        <div class="eval-cell"><div class="num" data-target="100" data-suffix="%">0%</div>
+          <div class="lbl">M2 黄标自洽</div><div class="ci">12/12</div></div>
+        <div class="eval-cell"><div class="num" data-target="11" data-suffix="/11">0/11</div>
+          <div class="lbl">M3 归因（真人 GT）</div><div class="ci">合成7/7+边界4/4</div></div>
+        <div class="eval-cell"><div class="num" data-target="100" data-suffix="%">0%</div>
+          <div class="lbl">M4 变式质量</div><div class="ci">3/3</div></div>
+      </div>
+      <div class="eval-evo">
+        <div class="erow"><span>R1</span><div class="ebar"><i data-w="66.7"></i></div><span class="mpct">66.7%</span></div>
+        <div class="erow"><span>R2</span><div class="ebar"><i data-w="50"></i></div><span class="mpct">50%</span></div>
+        <div class="erow"><span>R3</span><div class="ebar"><i data-w="45"></i></div><span class="mpct">45%</span></div>
+        <div class="erow"><span>R5</span><div class="ebar"><i data-w="90"></i></div><span class="mpct">90%</span></div>
+      </div>
+      <div class="src-note">来源：cache/eval_R1-R5.json · 证据/eval_R5.md · 扩样暴露矩阵域弱区 → 确定性模板族修复 → 90%</div>
+    </div>
+
+    <div class="panel" id="p-mcp">
+      <div class="panel-head"><span class="capsule">MCP Server</span><span class="file">stdio · 三工具 · 证据/mcp_test.txt</span></div>
+      <div class="terminal" id="mcp-term"></div>
+    </div>
+
+    <div class="panel brand-panel" id="p-end">
+      <div class="brand-title" style="font-size:clamp(30px,4.5vw,60px)">Math<em>Forge</em></div>
+      <div class="brand-sub">记忆驱动的数学训练 Agent</div>
+      <div class="layer-chips" style="margin-top:3vh">
+        <span class="capsule">评测集 20 用例</span>
+        <span class="capsule">双级验证 🟢🟡</span>
+        <span class="capsule">MCP 即服务</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="progress"><i></i></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const API = location.protocol.startsWith("http") ? "" : "http://127.0.0.1:8127";
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+/* ---------- 可暂停等待 ---------- */
+let paused = false, stopped = false;
+async function psleep(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (stopped) throw new Error("stopped");
+    while (paused && !stopped) await sleep(120);
+    await sleep(Math.min(120, end - Date.now()));
+  }
+}
+
+/* ---------- 字幕 ---------- */
+let caps = {};
+async function loadCaptions() {
+  try {
+    const d = await (await fetch("captions.json")).json();
+    (d.captions || []).forEach(c => caps[c.id] = c);
+  } catch (e) { /* 内嵌兜底在 step 中 */ }
+}
+function capMain(id, sub) {
+  const c = caps[id];
+  const el = $("cap-main");
+  el.style.display = "block"; $("cap-corner").style.display = "none";
+  el.innerHTML = "";
+  const t = document.createElement("div"); t.className = "l1"; t.textContent = c ? c.text : id;
+  el.appendChild(t);
+  if (sub !== false) {
+    const s = document.createElement("div"); s.className = "l2";
+    s.textContent = typeof sub === "string" ? sub : "MathForge · 记忆驱动的数学训练 Agent";
+    el.appendChild(s);
+  }
+}
+function capCorner(id) {
+  const c = caps[id];
+  const el = $("cap-corner");
+  el.style.display = "block"; $("cap-main").style.display = "none";
+  el.innerHTML = `<span class="tag">${c ? c.id.toUpperCase() : ""}</span>${c ? c.text : ""}`;
+}
+function capHide() { $("cap-main").style.display = "none"; $("cap-corner").style.display = "none"; }
+
+/* ---------- 面板 ---------- */
+function panel(id) {
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("show"));
+  const el = $(id);
+  el.classList.add("show");
+  el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in");
+}
+function seg(mode) {
+  document.body.className = mode === "engine" ? "seg-engine" : "seg-paper";
+}
+
+/* ---------- 工具 ---------- */
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+async function jget(p) { const r = await fetch(API + p); if (!r.ok) throw new Error(p + "→" + r.status); return r.json(); }
+async function jpost(p, b) {
+  const r = await fetch(API + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
+  if (!r.ok) throw new Error(p + "→" + r.status + " " + (await r.text()).slice(0, 100));
+  return r.json();
+}
+function tex(el, raw) {
+  const parts = String(raw ?? "").split(/(\$[^$]+\$)/g);
+  el.innerHTML = "";
+  for (const p of parts) {
+    if (p.startsWith("$") && p.endsWith("$") && p.length > 2 && window.katex) {
+      const s = document.createElement("span");
+      try { katex.render(p.slice(1, -1), s, { throwOnError: false }); el.appendChild(s); continue; } catch (e) { /* */ }
+    }
+    el.appendChild(document.createTextNode(p));
+  }
+}
+function badges(q) {
+  const lv = q.verify_level === "green"
+    ? '<span class="badge green">🟢 绿标 · SymPy 验证</span>' : '<span class="badge yellow">🟡 黄标 · 双盲校验</span>';
+  return lv + `<span class="chip">${esc(q.kp)}</span><span class="chip">${esc(q.difficulty)}</span>` +
+    (q.routed === "family" ? '<span class="chip">确定性模板族</span>' : "");
+}
+function renderQ(target, q) {
+  $(target + "-meta").innerHTML = badges(q);
+  tex($(target + "-statement"), q.statement_md);
+}
+function sideChips(dec) {
+  return [`难度 ${dec.difficulty}`, `× ${dec.count}`].concat(dec.plus_variant ? [`+变式 ×${dec.plus_variant}`] : [])
+    .map(c => `<span class="chip">${esc(c)}</span>`).join("");
+}
+function countUp(el, target, suffix, ms = 1400) {
+  const t0 = performance.now();
+  function tick(t) {
+    const k = Math.min(1, (t - t0) / ms);
+    const v = Math.round(target * (1 - Math.pow(1 - k, 3)));
+    el.textContent = v + suffix;
+    if (k < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- 演示脚本（每步 3-6s；全部读缓存，MATHFORGE_DEMO=1 零 API） ---------- */
+const CTX = {};  // 跨步传递（c04 的题目给 c05 复用，避免二次消耗家族实例导致归因预热错位）
+const STEPS = [
+  { cap: "c01", seg: "paper", panel: "p-brand", dur: 5000 },
+  { cap: "c02", seg: "paper", panel: "p-layers", dur: 5000 },
+  {
+    cap: "c03", seg: "engine", panel: "p-ingest", dur: 8000,
+    async run() {
+      const md = await (await fetch("demo_assets/高数-微分中值定理.md")).text();
+      const d = await jpost("/ingest", { md, source: "高数-微分中值定理.md" });
+      const kps = d.data.kp_list.map(k => k.kp);
+      const box = $("ingest-kps");
+      box.innerHTML = "";
+      kps.forEach((k, i) => {
+        const s = document.createElement("span");
+        s.className = "chip"; s.textContent = k;
+        s.style.animationDelay = (0.35 * i) + "s";
+        box.appendChild(s);
+      });
+      await psleep(3000);
+    },
+  },
+  {
+    cap: "c04", seg: "engine", panel: "p-q", dur: 9000,
+    async run() {
+      const d = await jget(`/generate?kp=${encodeURIComponent("罗尔定理")}&difficulty=${encodeURIComponent("基础")}&qtype=calculation`);
+      $("q-rule").textContent = d.decision.trigger_rule;
+      $("q-reason").textContent = d.decision.reason;
+      renderQ("q", d.question);
+      $("q-side-reason").textContent = d.decision.reason;
+      $("q-side-chips").innerHTML = sideChips(d.decision);
+      CTX.q1 = d.question;  // c05 归因演示复用同一题（预热 payload 对齐实例#1）
+      await psleep(5000);
+    },
+  },
+  {
+    cap: "c05", seg: "engine", panel: "p-attr", dur: 10000,
+    async run() {
+      // 与 scripts/player_prewarm.py 预热 payload 逐字一致（缓存命中）；题目复用 c04（CTX.q1）
+      const q = CTX.q1 || (await jget(`/generate?kp=${encodeURIComponent("罗尔定理")}&difficulty=${encodeURIComponent("基础")}&qtype=calculation`)).question;
+      const ans = await jpost("/answer", {
+        kp: q.kp, statement_md: q.statement_md, student_answer: "999",
+        standard_answer: q.answer_sympy ?? "", verify_level: q.verify_level || "green",
+        current_difficulty: q.difficulty || "基础", analysis: q.analysis || null,
+      });
+      const fixLine = ans.attribution === "计算失误"
+        ? '✋ 用户确认标签：<b>计算失误</b>（attribution_override 写入记忆）'
+        : `✋ 用户修正 → <span class="strike">${esc(ans.attribution)}</span> → <b>计算失误</b>（attribution_override 写入记忆）`;
+      $("attr-box").innerHTML = `
+        <div>LLM 归因：<span class="lbl">${esc(ans.attribution)}</span></div>
+        <div class="fix">${fixLine}</div>`;
+      $("attr-mem").textContent = "错题 + 修正标签落库；掌握度刷新；策略下一步随真实错因联动";
+      await psleep(6000);
+    },
+  },
+  {
+    cap: "c06", seg: "engine", panel: "p-policy", dur: 11000,
+    async run() {
+      // 修正为「计算失误」→ 下一步决策 = P4 数值变式 ×2 并降档
+      const d = await jget(`/generate?kp=${encodeURIComponent("罗尔定理")}&difficulty=${encodeURIComponent("基础")}&qtype=calculation`);
+      $("po-rule").textContent = d.decision.trigger_rule;
+      $("po-file").textContent = "P4 命中 · 数值变式 ×2 · 降一档";
+      renderQ("po", d.question);
+      $("po-side-lbl").textContent = "策略联动";
+      $("po-side-reason").textContent = d.decision.reason;
+      await psleep(4500);
+      // 变式题自动作答（答案=标准答案，判分走本地 SymPy）
+      const q = d.question;
+      await jpost("/answer", {
+        kp: q.kp, statement_md: q.statement_md, student_answer: q.answer_sympy,
+        standard_answer: q.answer_sympy, verify_level: q.verify_level || "green",
+        current_difficulty: q.difficulty || "基础", analysis: q.analysis || null,
+      });
+      $("po-side-reason").textContent = "✅ 变式题答对（SymPy 判分）→ 记忆更新";
+      await psleep(4500);
+    },
+  },
+  {
+    cap: "c07", seg: "engine", panel: "p-policy", dur: 13000,
+    async run() {
+      // 换知识点（薄弱点优先）：拉格朗日 ×2 连对 → P5 升档
+      const d1 = await jget(`/generate?kp=${encodeURIComponent("拉格朗日中值定理")}&difficulty=${encodeURIComponent("基础")}&qtype=calculation`);
+      const q1 = d1.question;
+      $("po-rule").textContent = d1.decision.trigger_rule;
+      $("po-file").textContent = "新知识点 · 基础探测";
+      renderQ("po", q1);
+      $("po-side-reason").textContent = d1.decision.reason;
+      await psleep(3200);
+      const a1 = await jpost("/answer", {
+        kp: q1.kp, statement_md: q1.statement_md, student_answer: q1.answer_sympy,
+        standard_answer: q1.answer_sympy, verify_level: q1.verify_level || "green",
+        current_difficulty: q1.difficulty || "基础", analysis: q1.analysis || null,
+      });
+      const d2 = await jget(`/generate?kp=${encodeURIComponent("拉格朗日中值定理")}&difficulty=${encodeURIComponent("进阶")}&qtype=calculation`);
+      const q2 = d2.question;
+      await jpost("/answer", {
+        kp: q2.kp, statement_md: q2.statement_md, student_answer: q2.answer_sympy,
+        standard_answer: q2.answer_sympy, verify_level: q2.verify_level || "green",
+        current_difficulty: q2.difficulty || "基础", analysis: q2.analysis || null,
+      });
+      $("po-file").textContent = "连对 2 次";
+      $("po-side-reason").textContent = "✅ 连对 ×2 → 记忆状态更新";
+      await psleep(3200);
+      const d3 = await jget(`/generate?kp=${encodeURIComponent("拉格朗日中值定理")}&difficulty=${encodeURIComponent("进阶")}&qtype=calculation`);
+      $("po-rule").textContent = d3.decision.trigger_rule;
+      $("po-file").textContent = "P5 命中 · 难度上移";
+      renderQ("po", d3.question);
+      $("po-side-reason").textContent = d3.decision.reason;
+      await psleep(3300);
+    },
+  },
+  {
+    cap: "c07b", seg: "engine", panel: "p-attr", dur: 9000,
+    async run() {
+      // 概念题答错 → 概念混淆 → P3（概念判断 + 变式）
+      const c = await jget(`/generate?kp=${encodeURIComponent("罗尔定理")}&difficulty=${encodeURIComponent("基础")}&qtype=concept`);
+      const q = c.question;
+      const a = await jpost("/answer", {
+        kp: q.kp, statement_md: q.statement_md, student_answer: "错误",
+        standard_answer: q.answer_md ?? q.correct ?? "正确", verify_level: q.verify_level || "yellow",
+        options: q.options || null, correct: q.correct ?? null,
+        current_difficulty: q.difficulty || "基础", analysis: q.analysis || null,
+      });
+      $("attr-box").innerHTML = `
+        <div>🟡 黄标概念题答「错误」→ LLM 归因：<span class="lbl">${esc(a.attribution)}</span><span class="conf">confidence 0.9</span></div>
+        <div class="fix">策略响应：P3 概念判断 ×1 + 定向变式 ×1</div>`;
+      $("attr-mem").textContent = a.next ? `${a.next.trigger_rule} · ${a.next.reason}` : "";
+      await psleep(5500);
+    },
+  },
+  {
+    cap: "c08", seg: "engine", panel: "p-eval", dur: 11000,
+    async run() {
+      document.querySelectorAll("#p-eval .num").forEach(el =>
+        countUp(el, +el.dataset.target, el.dataset.suffix));
+      await psleep(1600);
+      document.querySelectorAll("#p-eval .ebar > i").forEach((el, i) =>
+        setTimeout(() => { el.style.width = el.dataset.w + "%"; }, 260 * i));
+      await psleep(5500);
+    },
+  },
+  {
+    cap: "c09", seg: "engine", panel: "p-mcp", dur: 10000,
+    async run() {
+      const lines = [
+        ["t-dim", "# MCP Server 实测 · 真实 stdio 客户端（证据/mcp_test.txt）"],
+        ["t-cmd", "$ initialize + list_tools"],
+        ["t-ok",  "tools: ['generate_quiz', 'get_mastery', 'diagnose']"],
+        ["t-cmd", "$ generate_quiz(罗尔定理, 基础, calculation)"],
+        ["",      "status=ok | verify_level=green | answer=0（SymPy 构造背书）"],
+        ["t-cmd", "$ diagnose(学生答错)"],
+        ["t-ok",  "correct=False | attribution=审题错误 (confidence 0.9)"],
+        ["t-cmd", "$ get_mastery"],
+        ["",      'mastery=0.3 | last_wrong_attribution=审题错误 | half_life_days=7.0'],
+        ["t-dim", "→ 出题能力即服务：任意 Agent 生态一句话接入"],
+      ];
+      const term = $("mcp-term");
+      term.innerHTML = "";
+      for (const [cls, txt] of lines) {
+        if (stopped) throw new Error("stopped");
+        while (paused && !stopped) await sleep(120);
+        const div = document.createElement("div");
+        div.className = "t-line " + cls;
+        term.appendChild(div);
+        for (let i = 0; i <= txt.length; i += 2) {
+          div.textContent = txt.slice(0, i);
+          await sleep(14);
+        }
+        await sleep(160);
+      }
+    },
+  },
+  { cap: "c10", seg: "paper", panel: "p-end", dur: 6000 },
+];
+
+/* ---------- 执行器 ---------- */
+async function play() {
+  stopped = false; paused = false;
+  $("play-btn").textContent = "⏸ 暂停";
+  const total = STEPS.length;
+  $("stepno").textContent = `0/${total}`;
+  try {
+    for (let i = 0; i < total; i++) {
+      const s = STEPS[i];
+      $("stepno").textContent = `${i + 1}/${total}`;
+      $("progress").firstElementChild.style.width = (((i + 1) / total) * 100) + "%";
+      seg(s.seg);
+      panel(s.panel);
+      if (caps[s.cap]) capCorner(s.cap); else capHide();
+      if (s.run) await s.run();
+      // 大字幕：面板动作完成后给一句收束字幕（非首步）
+      await psleep(s.dur - 2000);
+      if (caps[s.cap] && i > 0) { capMain(s.cap); await psleep(1800); }
+      else await psleep(800);
+    }
+    $("progress").firstElementChild.style.width = "100%";
+    capMain("c10");
+  } catch (e) {
+    if (String(e.message) !== "stopped") {
+      const t = $("toast");
+      t.textContent = "演示中断（DEMO 模式需缓存预热，见 demo_checklist）：" + e.message;
+      t.classList.add("show");
+    }
+  }
+}
+
+$("play-btn").onclick = () => {
+  paused = !paused;
+  $("play-btn").textContent = paused ? "▶ 播放" : "⏸ 暂停";
+};
+$("replay-btn").onclick = () => location.reload();
+
+loadCaptions().then(() => play());
+</script>
+</body>
+</html>

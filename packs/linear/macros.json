@@ -1,0 +1,5 @@
+[
+  { "id": "macro.matrix", "name": "矩阵块", "trigger": "mat", "template": "mat(3,3, 1,2,3 | 4,5,6 | 7,8,9)", "scope": "linear", "note": "矩阵尺寸选择器生成 DSL 块" },
+  { "id": "macro.det", "name": "行列式块", "trigger": "det", "template": "det(3, 1,2,3 | 4,5,6 | 7,8,9)", "scope": "linear" },
+  { "id": "macro.sim", "name": "相似矩阵", "trigger": "sim", "template": "P^{-1}AP", "scope": "linear" }
+]

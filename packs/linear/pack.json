@@ -1,0 +1,16 @@
+{
+  "id": "linear",
+  "name": "线性代数",
+  "version": "0.2.0",
+  "description": "考研数学一·线性代数科目包：考纲 kp DAG + 出题专家域段 + 确定性模板族 + 题型规格蒸馏（蒸馏暂缓）",
+  "entry": {
+    "syllabus": "kp_graph.json",
+    "qtypes": "qtypes.json",
+    "examiner": "examiner/SKILL.md",
+    "families": "families",
+    "macros": "macros.json",
+    "strategy": "strategy.json"
+  },
+  "verify": { "engine": "sympy", "pack_validators": [] },
+  "requires_core": ">=2.0.0"
+}
