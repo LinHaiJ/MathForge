@@ -14,7 +14,7 @@ from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
-BANK_PATH = Path(__file__).resolve().parent / "题集" / "cxyonly.jsonl"
+BANK_PATH = Path(__file__).resolve().parents[1] / "题集" / "cxyonly.jsonl"
 FALLBACK_KP = "未分类"  # 题集中 3 题 kp 为 null（cxy-5269/8325/8326），归入「未分类」保证可刷可入记忆
 
 QTYPES = {"choice": "选择题", "solution": "解答题"}

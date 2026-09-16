@@ -7,11 +7,12 @@ decide(state, strategy) -> dict
   state 由 assembler.prepare_decision_state 提供，含：
     kp_id(str) / pack_id(str) / mastery_decayed(float) / prereq_mastery(dict: kp_id->decayed|None)
     / first_contact(bool) / last_wrong_attribution(str|None) / streak_correct(int)
-    / difficulty(str) / steps(int) / conn(sqlite|None, 用于落 policy_log)
+    / last_wrong_attribution_conf(float|None)
+    / difficulty(str) / steps(int) / conn(sqlite|None, 用于落决策事件)
   strategy 含 strategy['policy'] 阈值子表（见 pack_loader.DEFAULT_STRATEGY）。
 
 输出 {rule, action:{qtype, difficulty, reason, kp_target, count, ...}, snapshot: state}
-  —— 复用 v1 db.log_policy(conn, rule, snapshot, decision) 落 policy_log，可回放。
+  —— 决策单轨（复评 S5）：只写 attempt_events mode='policy'，可回放；不再写 v1 policy_log。
 """
 
 from __future__ import annotations
@@ -46,6 +47,36 @@ def _clamp_floor(difficulty: str, floor_token: str) -> str:
     return DIFFICULTY_LADDER[max(lo, cur)]
 
 
+
+def _kp_display(kp_id: str) -> str:
+    """kp 显示名（中文 name）；查不到原样返回。UI 红线：理由文案不裸显 kp id。"""
+    try:
+        pid = pack_loader.find_pack_for_kp(kp_id)
+        if pid:
+            k = pack_loader.get_kp(pack_loader.load_pack(pid), kp_id)
+            if k and k.get("name"):
+                return k["name"]
+    except Exception:
+        pass
+    return kp_id
+
+
+def _kp_reachable(kp_id: str) -> bool:
+    """演示模式下只推荐确定性族考点（学生复评：别把学生引向出不了题的死路）。"""
+    import os as _os
+    if _os.environ.get("MATHFORGE_DEMO") != "1":
+        return True
+    try:
+        for pid in pack_loader.list_packs():
+            pk = pack_loader.load_pack(pid)
+            for mod in (pk.get("families") or {}).values():
+                if getattr(mod, "KP_ID", None) == kp_id:
+                    return True
+        return False
+    except Exception:
+        return True
+
+
 def decide(state: dict, strategy: dict) -> dict:
     """P1-P6 优先级链决策（命中即执行，与 v1 同序：P1>P2>P3>P4>P5>P6）。"""
     pol = _policy(strategy)
@@ -73,6 +104,8 @@ def decide(state: dict, strategy: dict) -> dict:
             if pm is None or pm < p1_prereq_floor:
                 weak_prereq = pre
                 break
+        if weak_prereq and not _kp_reachable(weak_prereq):
+            weak_prereq = None  # 前置薄弱但当前模式出不了题 → 不硬推荐，落 P6
         if weak_prereq:
             rule = "P1"
             action = {
@@ -80,7 +113,7 @@ def decide(state: dict, strategy: dict) -> dict:
                 "qtype": "calculation",
                 "difficulty": diff,
                 "count": 1,
-                "reason": f"掌握度 {m_decayed:.0%}<{p1_mastery_floor:.0%} 且前置「{weak_prereq}」未达 {p1_prereq_floor:.0%}",
+                "reason": f"掌握度 {m_decayed:.0%}<{p1_mastery_floor:.0%} 且前置「{_kp_display(weak_prereq)}」未达 {p1_prereq_floor:.0%}",
             }
 
     # P2 知识点首次接触 → 基础难度（p2_dup_basic 控制是否双题探测）
@@ -95,8 +128,14 @@ def decide(state: dict, strategy: dict) -> dict:
             "reason": "知识点首次接触，基础难度探测" + ("×2" if count == 2 else ""),
         }
 
+    # 归因置信门控（2026-09-12）：低置信错因不驱动 P3/P4（68% GT 噪声不进调度阈值）。
+    # conf=None 视为 legacy 数据放行；人工 override 恒 1.0。
+    p34_conf_floor = float(pol.get("p34_conf_floor", 0.5))
+    attrib_conf = state.get("last_wrong_attribution_conf")
+    attr_trusted = attrib_conf is None or attrib_conf >= p34_conf_floor
+
     # P3 答错·概念混淆 → 概念判断 + 变式
-    if rule == "P6" and attrib == "概念混淆":
+    if rule == "P6" and attrib == "概念混淆" and attr_trusted:
         rule = "P3"
         variant = 1 if pol.get("p3_concept_variant", True) else 0
         action = {
@@ -109,7 +148,7 @@ def decide(state: dict, strategy: dict) -> dict:
         }
 
     # P4 答错·计算失误 → 数值变式（p4_penalty 控制降档，不低于 p4_drop_floor）
-    if rule == "P6" and attrib == "计算失误":
+    if rule == "P6" and attrib == "计算失误" and attr_trusted:
         rule = "P4"
         if pol.get("p4_penalty", True):
             new_diff = _clamp_floor(_shift(diff, -1), p4_drop_floor)
@@ -160,22 +199,13 @@ def decide(state: dict, strategy: dict) -> dict:
 
 
 def _log_decision(conn, rule: str, snapshot: dict, decision: dict) -> None:
-    """决策落盘：优先 v1 policy_log 表（若存在），否则写 mem2 事件流 mode='policy'。
-    —— 兼容 v2 新库（仅 mem2 schema，无 policy_log 表）与 v1 库（有 policy_log）。"""
+    """决策落盘（单轨，复评 S5）：只写 attempt_events（mode='policy'）。
+
+    此前按「policy_log 表存在与否」双轨回落——默认库有 v1 policy_log，导致
+    v2 时间线/当日明细（读 attempt_events）永远为空。现在 v2 决策只写事件流；
+    v1 演示线的策略台仍读 v1 policy.py 自己写的 policy_log，互不影响。"""
     if conn is None:
         return
-    try:
-        has = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='policy_log'"
-        ).fetchone()
-    except Exception:
-        has = None
-    if has:
-        try:
-            db.log_policy(conn, rule, snapshot, decision)
-            return
-        except Exception:
-            pass
     try:
         import mem2
 

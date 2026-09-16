@@ -41,6 +41,7 @@ def _reshape(item: dict) -> dict:
     item = dict(item)
     item.setdefault("kp_id", KP_ID)
     item.setdefault("verify_level", "green")
+    item.setdefault("analysis", "三阶行列式按对角线法则（沙路法）展开：正对角线三项之和减去副对角线三项之和；本题由 SymPy 按该定义直接计算并校验（构造即正确）。")
     return item
 
 

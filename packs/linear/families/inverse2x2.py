@@ -44,6 +44,7 @@ def _reshape(item: dict) -> dict:
     item = dict(item)
     item.setdefault("kp_id", KP_ID)
     item.setdefault("verify_level", "green")
+    item.setdefault("analysis", "二阶矩阵求逆：A⁻¹ = (1/det A)·[[d,−b],[−c,a]]（伴随矩阵除以行列式）；本题由 SymPy 按此公式直接计算并校验 A·A⁻¹ = I（构造即正确）。")
     return item
 
 

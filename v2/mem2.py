@@ -21,8 +21,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # 与 v1 db.py 同一定义：mathforge.db 位于仓库根目录（mem2.py 同目录）。
-# v1 db.py: DB_PATH = Path(__file__).resolve().parent / "mathforge.db"
-DB_PATH = Path(__file__).resolve().parent / "mathforge.db"
+# v1 db.py: DB_PATH = Path(__file__).resolve().parents[1] / "mathforge.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "mathforge.db"
 
 # 默认半衰期（与 v1 db.HALF_LIFE_DAYS、pack_loader.DEFAULT_STRATEGY 对齐）。
 DECAY_HALF_LIFE_DAYS = 7.0
@@ -251,7 +251,8 @@ def project_mastery(conn, kp: str, at=None, strategy=None) -> dict | None:
     rows = conn.execute(
         """
         SELECT ts, result FROM attempt_events
-        WHERE kp=? AND result IN ('correct','wrong','partial') AND mode<>'override'
+        WHERE kp=? AND result IN ('correct','wrong','partial')
+          AND mode NOT IN ('override','retry')
         ORDER BY ts DESC, id DESC
         LIMIT ?
         """,
@@ -275,6 +276,9 @@ def project_mastery(conn, kp: str, at=None, strategy=None) -> dict | None:
             last_ts = r["ts"]
 
     value = num / den if den > 0 else 0.0
+    if n == 1:
+        # 首答封顶（学生复评：一道基础题就把掌握度刷到 100% 是虚假安全感）
+        value = min(value, 0.7)
     decayed_value = _decayed(value, last_ts, at, decay_hl)
     return {
         "value": value,
@@ -417,7 +421,8 @@ def project_all(conn, strategy=None) -> dict:
 def _streak_correct(conn, kp: str) -> int:
     rows = conn.execute(
         "SELECT result FROM attempt_events "
-        "WHERE kp=? AND result IN ('correct','wrong','partial') AND mode<>'override' "
+        "WHERE kp=? AND result IN ('correct','wrong','partial') "
+        "AND mode NOT IN ('override','retry') "
         "ORDER BY ts DESC, id DESC",
         (kp,),
     ).fetchall()

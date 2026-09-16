@@ -23,6 +23,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(ROOT) / "v1"))  # eval 迁入 v1/
+sys.path.insert(0, str(Path(ROOT) / "v2"))  # pack_loader 迁入 v2/
 
 import eval as EV          # _load_kp / wilson_ci / KP_* 常量
 import generate            # generate_question / load_skill / _NS_GREEN

@@ -26,7 +26,8 @@ import re
 import sqlite3
 from datetime import date, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 import assembler
@@ -35,13 +36,61 @@ import pack_loader
 import policy2
 import router as v2route
 from attribute import attribute_error
-from generate import generate_question, _FAMILY_KP
-from verify import check_answer
+from generate import generate_question, _FAMILY_KP, render_flaws
+from verify import check_answer, parse_error
 
-router = APIRouter(tags=["v2"])
+class _ProfileRoute(APIRoute):
+    """把 X-MF-Profile 写入 contextvar 的自定义路由（每人一库）。
+
+    不用 app 中间件：BaseHTTPMiddleware 的 call_next 在 set() 之前已孵化下游任务，
+    contextvar 传不进线程池端点；也不子类化 APIRouter 重写 get_route_handler
+    （路由实例仍是 APIRoute，钩子不会被调）。规范做法 = APIRoute 子类 + route_class 参数。
+    """
+
+    def get_route_handler(self):
+        original = super().get_route_handler()
+
+        async def handler(request):
+            raw = request.headers.get("x-mf-profile", "")
+            if raw and not _PROFILE_RE.match(raw):
+                # 非法档案名拒绝而非静默回落（复评 S1：回落会破坏隔离语义）
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"ok": False, "code": "bad_profile",
+                                     "reason": "档案名不合法（仅限中英文、数字、连字符，≤16 字符）"},
+                                    status_code=422)
+            set_profile(raw)
+            return await original(request)
+
+        return handler
+
+
+router = APIRouter(route_class=_ProfileRoute, tags=["v2"])
 
 # 库路径覆盖环境变量（测试隔离；未设置时用 mem2 默认库 mathforge.db）
 DB_ENV = "MATHFORGE_V2_DB"
+
+# 每人一库（2026-09-12，AI-PM 评审 B1）：请求头 X-MF-Profile 选择学习者档案库。
+# app.py 中间件把请求头写入 contextvar；db_path() 按此切库（环境变量 MATHFORGE_V2_DB 仍最高优先，
+# 保证测试隔离不受影响）。档案名强校验：中英数下划线连字符 ≤16 字符，杜绝路径注入。
+import contextvars as _cvars
+import re as _re
+
+_PROFILE: "_cvars.ContextVar[str]" = _cvars.ContextVar("mf_profile", default="")
+_PROFILE_RE = _re.compile(r"^[\w\u4e00-\u9fa5-]{1,16}$")
+# 档案库根目录可注入（PM 复评 P0：此前 pytest rmtree 会清空真实学习者档案库）。
+# 动态读取（函数封装）：测试夹具在导入后才设 env，模块常量会固化失效。
+def _profiles_dir() -> str:
+    return os.environ.get("MATHFORGE_PROFILES_DIR") or str(
+        mem2.default_db_path().parent / "profiles")
+
+
+def set_profile(name: str) -> None:
+    """中间件入口：校验并设置当前请求的学习者档案（非法值一律回落默认库）。"""
+    _PROFILE.set(name if name and _PROFILE_RE.match(name or "") else "")
+
+
+def current_profile() -> str:
+    return _PROFILE.get()
 
 # v2 题型 → generate.py 生成通道。
 # "fill"（填空）走绿标计算链：SymPy 构造答案 + 盲解对账，家族 kp 零 API 可用。
@@ -57,7 +106,7 @@ _RESULT_WRONG = "wrong"
 # 从 generate_question 结果里透传给前端的字段（白名单，保证可 JSON 序列化）
 _Q_FIELDS = (
     "statement_md", "answer_sympy", "answer_md", "analysis", "options", "correct",
-    "verify_level", "params", "family", "routed", "difficulty", "attempt",
+    "verify_level", "params", "family", "routed", "difficulty", "attempt", "question_fp",
     "judge_flag", "verification", "design_note",
 )
 
@@ -121,11 +170,15 @@ def _try_pack_family(pack: dict, kp_id: str, seed: int | None = None) -> dict | 
         if enum is None:
             continue
         items = [it for it in enum(limit=24)
-                 if it and all(bool(v) for _, v in it.get("assert", []))]
+                 if it and all(bool(v) for _, v in it.get("assert", []))
+                 and not render_flaws(it.get("statement_md") or "")
+                 and not render_flaws(it.get("analysis") or "")]
         if not items:
             return None
         idx = 0 if seed is None else seed % len(items)
-        return _normalize_pack_question(items[idx], mod, kp_name or items[idx].get("kp"))
+        out = _normalize_pack_question(items[idx], mod, kp_name or items[idx].get("kp"))
+        out["question_fp"] = _question_fp(out.get("family"), out.get("params"))
+        return out
     return None
 
 
@@ -133,9 +186,9 @@ def _normalize_pack_question(item: dict, mod, kp_name: str) -> dict:
     """把包内族实例归一成与 /v2/turn（v1 家族路径）同构的 question 字典。
 
     与 generate_from_family 输出同构：statement_md/answer_sympy/answer_md/analysis/
-    options/correct/verify_level/params/family/routed/difficulty。analysis 留空
-    （包内族无 LLM 解析，零 API）；verify_level=green（构造即正确）；routed=family
-    （与 v1 家族路由证据一致，前端无需区分来源）。
+    options/correct/verify_level/params/family/routed/difficulty。analysis 透传族内
+    参数化解题要点（2026-09-12：12 族全部自带，答错后「看正确答案与解法」有实content）；
+    verify_level=green（构造即正确）；routed=family。
     """
     params = item.get("params", {}) or {}
     return {
@@ -146,7 +199,7 @@ def _normalize_pack_question(item: dict, mod, kp_name: str) -> dict:
         "statement_md": item.get("statement_md", ""),
         "answer_sympy": item.get("answer_sympy"),
         "answer_md": None,
-        "analysis": "",
+        "analysis": item.get("analysis") or "",
         "options": None,
         "correct": None,
         "verify_level": "green",
@@ -195,8 +248,21 @@ def _sanitize_reason(msg: str) -> str:
 
 
 def db_path() -> str:
-    """当前 v2 库路径（环境变量优先，便于测试隔离）。"""
-    return os.environ.get(DB_ENV) or str(mem2.default_db_path())
+    """当前 v2 库路径：学习者档案库 > 环境变量（测试隔离兜底）> 默认库。
+
+    profile 优先于 env：带 X-MF-Profile 的请求永远落档案库（含测试内验证）；
+    无档案头时 env/默认兜底不变。非法档案名在 set_profile 已回落 ""。
+    """
+    profile = current_profile()
+    if profile:
+        from pathlib import Path as _Path
+        pd = _Path(_profiles_dir())
+        pd.mkdir(parents=True, exist_ok=True)
+        return str(pd / f"mathforge_{profile}.db")
+    env = os.environ.get(DB_ENV)
+    if env:
+        return env
+    return str(mem2.default_db_path())
 
 
 def get_conn() -> sqlite3.Connection:
@@ -224,6 +290,8 @@ class AnswerBody(BaseModel):
     analysis: str | None = None
     attribution_override: str | None = None   # 人工一键修正标签（优先于 LLM 归因）
     difficulty: str = "基础"
+    question_fp: str = ""                # 服务端题目指纹（/v2/turn 下发，防重提交凭据）
+    mode: str = "answer"                 # answer | variant（AI 变式作答，任务书 P2-b）
 
 
 class SelfAssessBody(BaseModel):
@@ -328,7 +396,10 @@ def v2_turn(body: TurnBody):
     # 下方仍交 generate_question 命中 root 家族或 LLM，两者不冲突。
     gen_qtype = _GEN_QTYPE.get(body.qtype, body.qtype)
     if body.qtype in ("fill", "solution"):
-        pack_q = _try_pack_family(pack, body.kp_id)
+        # 主练习入口也要出不同的题（复评 S2）：此前恒 seed=None → 恒出第 0 格，
+        # 同一 kp 连打 N 次题干逐字节相同。随机 seed；守卫过滤在 _try_pack_family 内。
+        import random as _random
+        pack_q = _try_pack_family(pack, body.kp_id, seed=_random.randrange(2 ** 31))
         if pack_q is not None:
             question = {k: pack_q[k] for k in _Q_FIELDS if k in pack_q}
             question["kp"] = kp["name"]          # 出题侧中文 kp 名（判分/归因证据用）
@@ -357,7 +428,6 @@ def v2_turn(body: TurnBody):
             "demo_available_kps": _demo_available_kps(pack, body.difficulty),
         }
 
-    gen_qtype = _GEN_QTYPE.get(body.qtype, body.qtype)
     try:
         # kp_context 只传中文 name —— 与 v1 /generate 完全一致的载荷，保证家族路由命中与缓存复用
         q = generate_question({"kp": kp["name"]}, difficulty=body.difficulty, qtype=gen_qtype)
@@ -376,6 +446,7 @@ def v2_turn(body: TurnBody):
     question["kp"] = kp["name"]          # 出题侧中文 kp 名（判分/归因证据用）
     question["qtype"] = body.qtype        # 对外题型口径（fill），生成通道见 gen_qtype
     question["gen_qtype"] = gen_qtype
+    question["question_fp"] = _question_fp(question.get("family"), question.get("params"))
     _selfgrade_if_matrix(question)
     return {
         "ok": True,
@@ -393,46 +464,112 @@ def v2_turn(body: TurnBody):
 @router.post("/answer")
 def v2_answer(body: AnswerBody):
     """判分（SymPy 等价）→ 归因（override 优先）→ 写事件流 → 投影 → P1-P6 决策。"""
+    # 解析预检（2026-09-12 P0）：学生输入不可解析时【不记事件、不出决策】——
+    # 这类输入判分恒 False 但零学习信号，记入只会污染记忆与蒸馏。
+    perr = parse_error(body.student_answer)
+    if perr:
+        return {"ok": True, "correct": False, "parse_error": perr,
+                "event_recorded": False, "event_id": None, "decision": None}
+
     correct = check_answer(body.student_answer, body.standard_answer or "")
 
     attribution = None
     overridden = False
+    real_conf = None
     if not correct:
         if body.attribution_override:
             attribution = body.attribution_override
             overridden = True
         else:
-            # attribute_error 自带兜底（LLM 不可用时返回低置信占位），不阻塞闭环
-            attribution = attribute_error(
+            # attribute_error 自带兜底（LLM 不可用时返回「未归因」低置信占位），不阻塞闭环
+            ad = attribute_error(
                 body.statement_md, body.student_answer,
                 body.standard_answer or "", body.analysis,
-            )["attribution"]
+            )
+            attribution = ad["attribution"]
+            real_conf = ad.get("confidence")
 
-    attr_payload = {"type": attribution, "conf": 1.0 if overridden else 0.9} if attribution else None
+    attr_payload = {"type": attribution,
+                    "conf": 1.0 if overridden else (real_conf if not overridden else None)
+                    } if attribution else None
     # 落库增强（B1）：meta 存题干/答案摘要与难度，供 /v2/variant 取「源题」与溯源区
     meta = {
-        "stmt_summary": (body.statement_md or "")[:160],
-        "standard_summary": (body.standard_answer or "")[:160],
+        "stmt_summary": _safe_trunc_math(body.statement_md or "", 160),
+        "standard_summary": _safe_trunc_math(body.standard_answer or "", 160),
         "difficulty": body.difficulty,
     }
     conn = get_conn()
+    # 作答通道（任务书 P2-b）：answer=常规作答；variant=AI 变式作答（同核不同壳）。
+    # 白名单外回退 answer，不 422——判分口径完全一致，只是事件标记不同。
+    if body.mode not in ("answer", "variant"):
+        body.mode = "answer"
     try:
+        # 同题去重（复评 S4 + 全栈复审 P1 加固）：指纹优先（服务端下发，不可伪造），
+        # 兜底题干摘要；比对该 kp 最近 8 条作答——交替两题的绕过也被覆盖。
+        # P2 口径：按作答通道隔离比对——母题（answer）做过不拦同核变式（variant），
+        # 重复提交同一变式仍被拦（q_fp 同 + mode 同）。
+        recent = conn.execute(
+            "SELECT meta FROM attempt_events WHERE kp=? AND mode=? "
+            "ORDER BY id DESC LIMIT 8", (body.kp, body.mode)).fetchall()
+        dup_reason = None
+        for r in recent:
+            m = json.loads(r[0]) if r[0] else {}
+            if body.question_fp and m.get("q_fp") == body.question_fp:
+                dup_reason = "同一道题已提交过（正确答案与解法已展示）。再做一道新题吧——「再练一题」或「按策略练」都可以。"
+                break
+            if not body.question_fp and m.get("stmt_summary") and m.get("stmt_summary") == _safe_trunc_math(
+                    body.statement_md or "", 160):
+                dup_reason = "同一道题已提交过。再做一道新题吧。"
+                break
+        if dup_reason:
+            # 订正通道（学生复评 #3）：同一题之前答错、本次答对 → 记 retry 事件
+            # （不进掌握度滑动窗，但修正「最近错因/连对」），给学生一条翻案路。
+            # 幂等（PM 复评 #4 缝隙）：该题已订正过（最近事件含 retry）→ 返回 duplicate 不再落事件，
+            # 堵「无限重交正确答案刷假连对触发 P5」的缝隙。
+            already_retry = False
+            for r in recent:
+                m = json.loads(r[0]) if r[0] else {}
+                if body.question_fp and m.get("q_fp") == body.question_fp and m.get("retry"):
+                    already_retry = True
+                    break
+                if not body.question_fp and m.get("retry") and m.get(
+                        "stmt_summary") == _safe_trunc_math(body.statement_md or "", 160):
+                    already_retry = True
+                    break
+            first_row = conn.execute(
+                "SELECT result FROM attempt_events WHERE kp=? AND mode=? "
+                "ORDER BY id DESC LIMIT 1", (body.kp, body.mode)).fetchone()
+            last_result = first_row[0] if first_row else None
+            if correct and last_result in ("wrong", "partial") and not already_retry:
+                retry_id = mem2.append_event(
+                    conn, pack=body.pack_id, kp=body.kp, qtype=body.qtype,
+                    mode="retry", result="correct", attribution=None,
+                    meta={**meta, "q_fp": body.question_fp or None, "retry": True,
+                          "retry_of": "wrong"}, sim=0)
+                return {"ok": True, "correct": True, "duplicate": False, "retry": True,
+                        "attribution": None, "overridden": False, "event_id": retry_id,
+                        "event_recorded": True, "decision": None,
+                        "reason": "订正成功！本次不计入掌握度，但错因记录已更新。"}
+            return {"ok": True, "correct": correct, "duplicate": True,
+                    "event_recorded": False, "event_id": None, "decision": None,
+                    "parse_error": None, "reason": dup_reason}
         event_id = mem2.append_event(
             conn,
             pack=body.pack_id,
             kp=body.kp,
             qtype=body.qtype,
-            mode="answer",
+            mode=body.mode,
             result=_RESULT_CORRECT if correct else _RESULT_WRONG,
             attribution=attr_payload,
             user_override=attr_payload if overridden else None,
-            meta=meta,
+            meta={**meta, "parse_ok": True, "q_fp": body.question_fp or None},
             sim=0,
         )
         pack = _load_pack(body.pack_id)
         if pack is None:
             return {"ok": True, "correct": correct, "attribution": attribution,
                     "overridden": overridden, "event_id": event_id, "decision": None,
+                    "event_recorded": True,
                     "reason": f"科目包不可用（pack_id={body.pack_id}），已记事件但跳过决策"}
         strategy = pack["strategy"]
         state = assembler.prepare_decision_state(conn, pack, body.kp, body.difficulty,
@@ -444,11 +581,116 @@ def v2_answer(body: AnswerBody):
             "attribution": attribution,
             "overridden": overridden,
             "event_id": event_id,
+            "event_recorded": True,
             "decision": {"rule": decision["rule"], "action": decision["action"]},
             "state": {k: v for k, v in state.items() if k != "conn"},
         }
     finally:
         conn.close()
+
+
+def _question_fp(family, params) -> str:
+    """服务端题目指纹：family + 参数排序哈希（复评 P1：去重键不信任客户端上报的题干）。"""
+    import hashlib as _hl
+    try:
+        payload = json.dumps({"f": family, "p": params}, sort_keys=True,
+                             ensure_ascii=False, default=str)
+    except Exception:
+        payload = str(family) + str(params)
+    return _hl.md5(payload.encode("utf-8")).hexdigest()[:16]
+
+
+class ParseCheckBody(BaseModel):
+    """填空表达式可解析性预检（不落库、不调 LLM、零成本）。"""
+    expr: str
+
+
+# --------------------------------------------------------------------------- #
+# 拍照识别（可选 sidecar：WorkBuddy mathforge_ingest.service，默认 127.0.0.1:8600）
+# --------------------------------------------------------------------------- #
+_INGEST_HINT = ("拍照识别是可选组件：先启动识别服务（在 mathforge_ingest 项目目录 "
+                "python -m uvicorn mathforge_ingest.service:app --port 8600），再重试；"
+                "也可以直接键盘输入。")
+
+
+def _extract_answer_latex(markdown: str) -> str | None:
+    """从转写 markdown 里启发式提取『最终答案』候选：最后一个数学块的内容。
+
+    识别结果永远只作回填候选，由学生核对/修改后提交（AI 识别请核对红线），
+    因此这里宁缺毋滥：取不到就返回 None，前端不回填。
+    """
+    if not markdown:
+        return None
+    blocks = re.findall(r"\$\$(.+?)\$\$", markdown, re.S) or \
+        re.findall(r"\$([^$\n]+?)\$", markdown)
+    if not blocks:
+        return None
+    cand = blocks[-1].strip().strip("` ")
+    # 推导链形态（如 "[..]_{1}^{3} = 12"）→ 取最后一个等号后的最终值
+    if "=" in cand:
+        cand = cand.split("=")[-1].strip()
+    # 明显不是答案的形态（纯文字/问号掩码）→ 放弃
+    if not cand or "⟨" in cand or len(cand) > 120 or "\n" in cand:
+        return None
+    return cand
+
+
+@router.post("/photo-recognize")
+async def v2_photo_recognize(file: UploadFile = File(...)):
+    """手写作答拍照 → 识别 sidecar → 回填候选（不直接判分、不落事件）。
+
+    学生核对/修改后走 /v2/answer 正常闭环（记忆单一入口）。
+    sidecar 未启动 → 200 + {ok:false, code:"ingest_unavailable"}（可选组件不阻断）。
+    """
+    try:
+        import httpx
+    except ImportError:
+        return {"ok": False, "code": "ingest_unavailable",
+                "reason": "服务端缺少 httpx 依赖（pip install httpx）", "hint": _INGEST_HINT}
+    data = await file.read()
+    if not data:
+        return {"ok": False, "code": "empty_file", "reason": "空文件", "hint": _INGEST_HINT}
+    if len(data) > 20 * 1024 * 1024:
+        return {"ok": False, "code": "too_large", "reason": "图片超过 20MB，请压缩后重试",
+                "hint": _INGEST_HINT}
+    ingest_url = os.environ.get("MATHFORGE_INGEST_URL", "http://127.0.0.1:8600")
+    try:
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.post(
+                f"{ingest_url}/recognize",
+                files={"file": (file.filename or "photo.png", data,
+                                file.content_type or "image/png")},
+                data={"strict": "true"},
+            )
+            sidecar = resp.json()
+    except Exception:
+        return {"ok": False, "code": "ingest_unavailable", "reason": "识别服务未响应",
+                "hint": _INGEST_HINT}
+
+    if sidecar.get("status") != "ok":
+        return {"ok": False, "code": sidecar.get("status") or "sidecar_error",
+                "reason": sidecar.get("reject_reason") or sidecar.get("error") or "识别失败",
+                "hint": sidecar.get("agent_hint") or _INGEST_HINT}
+
+    md = sidecar.get("markdown") or ""
+    return {"ok": True,
+            "decision": sidecar.get("decision"),          # accept / review / unclear
+            "answer_latex": _extract_answer_latex(md),
+            "markdown": md,
+            "issues": sidecar.get("issues") or [],
+            "unclear_count": sidecar.get("unclear_count", 0),
+            "agent_hint": sidecar.get("agent_hint")}
+
+
+@router.post("/parse-check")
+def v2_parse_check(body: ParseCheckBody):
+    """提交前预检：学生输入能否被 SymPy 解析并参与判分。
+
+    不可解析 → {parseable:false, error}：前端拦截提交并给出可读提示，
+    避免"判错但学不到任何东西"的作答进入事件流（2026-09-12 P0）。
+    """
+    err = parse_error(body.expr)
+    return {"ok": True, "parseable": err is None, "error": err}
 
 
 # --------------------------------------------------------------------------- #
@@ -505,8 +747,8 @@ def v2_selfassess(body: SelfAssessBody):
             meta={"steps": list(body.student_steps),
                   "step_count": len(body.student_steps),
                   # 题干/答案摘要：供复习卡「最近」与 /v2/variant 源题复用（B1 落库增强延伸）
-                  "stmt_summary": (body.statement_md or "")[:160],
-                  "standard_summary": (body.standard_answer or "")[:160]},
+                  "stmt_summary": _safe_trunc_math(body.statement_md or "", 160),
+                  "standard_summary": _safe_trunc_math(body.standard_answer or "", 160)},
             sim=0,
         )
         m = _mastery_after(body.pack_id, body.kp, conn)
@@ -542,7 +784,7 @@ def v2_steps_attribute(body: StepsAttributeBody):
     """
     if not _llm_available():
         return {"ok": False, "degraded": True,
-                "reason": "演示模式或未配置 API key：分步归因不可用在（机器不判步骤分，请对照解析自评）"}
+                "reason": "演示模式或未配置 API key：分步归因不可用（机器不判步骤分，请对照解析自评）"}
 
     student_answer = "\n".join(body.steps)
     try:
@@ -557,6 +799,7 @@ def v2_steps_attribute(body: StepsAttributeBody):
             user = (f"题干：{body.statement_md}\n标准答案：{body.standard_answer}\n"
                     f"标准解析：{(body.analysis or '')[:400]}\n学生步骤：\n{joined}")
             try:
+                from llm import chat_json  # 函数内延迟导入：此前漏 import，NameError 被吞成 step_notes=None（对抗审查 P1）
                 nd = chat_json([{"role": "system", "content": _STEP_NOTE_SYSTEM},
                                 {"role": "user", "content": user}],
                                temperature=0.3, namespace="steps-attr:")
@@ -603,7 +846,7 @@ def _kp_recent(conn, kp_id: str, limit: int = 6) -> list[dict]:
         meta = json.loads(r[3]) if r[3] else {}
         out.append({
             "result": r[2], "mode": r[1],
-            "stmt": (meta.get("stmt_summary") or "")[:100],
+            "stmt": _safe_trunc_math(meta.get("stmt_summary") or "", 100),
         })
     return out
 
@@ -688,6 +931,13 @@ def v2_stats():
     try:
         allp = mem2.project_all(conn)
         event_count = conn.execute("SELECT COUNT(*) FROM attempt_events").fetchone()[0]
+        # 归因质量监控（AI-PM 评审）：override 率 = 人工修正数 / 错答数，漂移>40% 说明归因该重训了
+        wrong_total = conn.execute(
+            "SELECT COUNT(*) FROM attempt_events WHERE result='wrong' AND mode IN ('answer','selfassess')"
+        ).fetchone()[0]
+        override_total = conn.execute(
+            "SELECT COUNT(*) FROM attempt_events WHERE mode='override'"
+        ).fetchone()[0]
     finally:
         conn.close()
     packs = []
@@ -697,10 +947,87 @@ def v2_stats():
             continue
         packs.append({"id": pid, "name": pack["manifest"].get("name"),
                       "kp_count": len(pack["kp_graph"])})
-    return {"kp_count": len(allp), "event_count": event_count, "kps": allp, "packs": packs}
+    return {"kp_count": len(allp), "event_count": event_count, "kps": allp, "packs": packs,
+            "wrong_total": wrong_total, "override_total": override_total,
+            "override_rate": round(override_total / wrong_total, 3) if wrong_total else None}
 
 
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 4a. 今日计划（AI-PM 评审「明日三题」缺口：已练最弱优先，冷启动给零 API 族保底）
+# --------------------------------------------------------------------------- #
+@router.get("/plan")
+def v2_plan(n: int = 3):
+    """今日练习计划 n 条（默认 3）：
+
+    已练 kp 按衰减掌握度升序（最弱优先，附上次错因）；不足部分用「从未练过的
+    零 API 确定性族 kp」补齐（冷启动保底，离线可出题）。理由文案只用中文名。
+    """
+    n = max(1, min(n, 10))
+    zero_api: set = set()
+    kp_index: dict = {}
+    for pid in pack_loader.list_packs():
+        pack = _load_pack(pid)
+        if pack is None:
+            continue
+        for mod in (pack.get("families") or {}).values():
+            kid = getattr(mod, "KP_ID", None)
+            if kid:
+                zero_api.add(kid)
+        for k in pack["kp_graph"]:
+            kp_index[k["id"]] = (pid, k.get("name") or k["id"])
+    conn = get_conn()
+    try:
+        allp = mem2.project_all(conn)
+    finally:
+        conn.close()
+
+    items = []
+
+    def entry(kid, reason):
+        pid, name = kp_index[kid]
+        return {"kp_id": kid, "name": name, "pack_id": pid,
+                "zero_api": kid in zero_api, "reason": reason}
+
+    practiced = [(kid, proj) for kid, proj in allp.items() if kid in kp_index]
+    practiced.sort(key=lambda kv: (kv[1].get("decayed_value") or 0))
+    for kid, proj in practiced:
+        if len(items) >= n:
+            break
+        dv = proj.get("decayed_value") or 0
+        la = proj.get("last_attribution")
+        attr = la.get("type") if isinstance(la, dict) else None
+        if isinstance(attr, str) and attr == "未归因":
+            attr = None
+        reason = f"掌握度 {round(dv * 100)}%" + (f" · 上次错因：{attr}" if attr else "")
+        items.append(entry(kid, reason))
+    if len(items) < n:
+        for kid in sorted(kp_index):
+            if len(items) >= n:
+                break
+            if kid in allp or kid not in zero_api:
+                continue
+            items.append(entry(kid, "还没练过（基础模板，离线可出题）"))
+    # 计划落库（复评 M7）：每天一条 mode='plan' 事件——「关浏览器不失忆」的最小实现
+    today = date.today().isoformat()
+    try:
+        conn2 = get_conn()
+        try:
+            already = conn2.execute(
+                "SELECT 1 FROM attempt_events WHERE mode='plan' AND day=? LIMIT 1", (today,)
+            ).fetchone()
+            if not already and items:
+                mem2.append_event(conn2, pack="", kp="", qtype="", mode="plan", result="plan",
+                                  meta={"items": [{"kp_id": it["kp_id"], "name": it["name"]}
+                                                  for it in items]}, sim=0)
+                conn2.commit()
+        finally:
+            conn2.close()
+    except Exception:  # noqa: BLE001 —— 落库失败不阻断计划返回
+        pass
+    return {"ok": True, "date": date.today().isoformat(), "items": items}
+
+
 # 4b. 足迹热力图（近 N 天每日作答计数）
 # --------------------------------------------------------------------------- #
 @router.get("/heatmap")
@@ -718,7 +1045,8 @@ def v2_heatmap(days: int = 180):
     try:
         rows = conn.execute(
             "SELECT day, COUNT(*), SUM(result='correct') "
-            "FROM attempt_events WHERE day >= ? GROUP BY day ORDER BY day",
+            "FROM attempt_events WHERE day >= ? AND mode IN ('answer', 'selfassess', 'variant') "
+            "GROUP BY day ORDER BY day",
             (cutoff,),
         ).fetchall()
     finally:
@@ -978,6 +1306,7 @@ def _variant_response(pack_id: str, kp: dict, q: dict, body: VariantBody,
     question["kp"] = kp["name"]
     question["qtype"] = body.qtype
     question["gen_qtype"] = _GEN_QTYPE.get(body.qtype, body.qtype)
+    question["question_fp"] = _question_fp(question.get("family"), question.get("params"))
     _selfgrade_if_matrix(question)
     return {"ok": True, "pack_id": pack_id, "kp": _kp_view(kp), "question": question,
             "provenance": provenance, "difficulty": body.difficulty}
@@ -1009,6 +1338,105 @@ def _variant_with_source(pack: dict, kp: dict, src: dict, body: VariantBody) -> 
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
                 "reason": _sanitize_reason(f"变式生成失败：{e}")}, "failed"
+
+
+class VariantAiBody(BaseModel):
+    pack_id: str | None = None   # 缺省按 kp 全局路由（与 VariantBody 一致——前端从不传 pack_id）
+    kp_id: str
+    seed: int | None = None
+    k: int = 3
+    strategy: str | None = None   # None=按记忆自动选择；显式 contextual|multistep 覆盖
+
+
+def _pick_variant_strategy(conn: sqlite3.Connection, kp_id: str) -> str:
+    """记忆驱动变式策略（任务书 P2-a；蒸馏任务书 §5.1 分诊表的运行时化）。
+
+    该 kp 最近答错/半会 → contextual（同核换外壳 = 识别练习）；
+    最近做对且连对 ≥2 → multistep（多步拆分 = 迁移练习）；
+    无记录 / 连对不足 → contextual 默认。纯规则，不调 LLM。
+    """
+    row = conn.execute(
+        "SELECT result FROM attempt_events WHERE kp=? AND result IN ('correct','wrong','partial') "
+        "AND mode NOT IN ('override','retry') ORDER BY ts DESC, id DESC LIMIT 1",
+        (kp_id,),
+    ).fetchone()
+    if row is None or row[0] in ("wrong", "partial"):
+        return "contextual"
+    if mem2._streak_correct(conn, kp_id) >= 2:
+        return "multistep"
+    return "contextual"
+
+
+@router.post("/variant/ai")
+def v2_variant_ai(body: VariantAiBody):
+    """AI 变式（任务书 P1，2026-09-15）：确定性数学核 + LLM 考察计划/外壳 + 三闸门。
+
+    三权分立：调度不生成、生成不验证、验证不调度。答案恒为核答案（闸门 G2 与 /v2/answer 双保险）；
+    换问型（答案目标改变）一期禁止。任何失败 → 参数扰动降级（degraded:true）。
+    策略（P2）：strategy 缺省时由记忆驱动——答错换壳识别、连对多步迁移。
+    """
+    import random as _random
+    import ai_variant as _aiv
+
+    pack, route_info = _resolve_pack(body.pack_id, body.kp_id)
+    if pack is None:
+        return {"ok": False, "reason": f"未找到科目包（kp_id={body.kp_id}）", "route": route_info}
+    pack_id = pack["manifest"]["id"]
+    kp = pack_loader.get_kp(pack, body.kp_id)
+    if kp is None:
+        return {"ok": False, "reason": f"包 {pack_id} 内不存在知识点 {body.kp_id}", "pack_id": pack_id}
+
+    seed = body.seed if body.seed is not None else _random.randrange(2 ** 31)
+    kernel = _try_pack_family(pack, body.kp_id, seed=seed)
+    if kernel is None:
+        return {"ok": False, "code": "no_kernel", "pack_id": pack_id, "kp": _kp_view(kp),
+                "reason": "该考点暂无确定性数学核（模板族），AI 变式需先建族"}
+
+    strategy_src = "explicit"
+    strategy = body.strategy
+    if strategy not in ("contextual", "multistep"):
+        conn = get_conn()
+        try:
+            strategy = _pick_variant_strategy(conn, body.kp_id)
+        finally:
+            conn.close()
+        strategy_src = "auto"
+    res = _aiv.make_ai_variants(kernel, k=max(1, min(body.k, 5)), strategy=strategy,
+                                usage_count=kp.get("usage_count"))
+
+    vb = VariantBody(pack_id=pack_id, kp_id=body.kp_id, qtype="fill",
+                     difficulty=kernel.get("difficulty", "基础"))
+    if res.get("ok") and res.get("variants"):
+        pick = res["variants"][_random.randrange(len(res["variants"]))]
+        q = dict(kernel)
+        q["statement_md"] = pick["stem_md"]   # 只换外壳：答案/参数/解析沿用数学核
+        provenance = {
+            "source_kind": "ai_variant",
+            "source_summary": kernel.get("statement_md"),
+            "changes": [{"type": "ai_shell", "desc": f"AI {pick['kind']}：{pick.get('note', '')}"}],
+            "consistency": True,
+        }
+        out = _variant_response(pack_id, kp, q, vb, provenance)
+        out["variant_meta"] = {
+            "engine": "ai", "kind": pick["kind"], "g2_kind": pick.get("g2_kind"),
+            "strategy": strategy, "strategy_src": strategy_src,
+            "plan": res.get("plan"), "stats": res.get("stats"),
+            "alternates": len(res["variants"]) - 1, "degraded": False,
+        }
+        return out
+
+    # 降级链：参数扰动（同族新格，答案仍构造即正确）
+    q_fb = _try_pack_family(pack, body.kp_id, seed=_random.randrange(2 ** 31))
+    if q_fb is None:
+        return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
+                "reason": _sanitize_reason(f"AI 变式不可用：{res.get('reason', '未知')}，且该考点无备用参数格")}
+    provenance = {"source_kind": "family", "source_summary": kernel.get("statement_md"),
+                  "changes": [{"type": "param", "desc": f"AI 变式降级：{res.get('reason', '')}（参数扰动兜底）"}],
+                  "consistency": True}
+    out = _variant_response(pack_id, kp, q_fb, vb, provenance)
+    out["variant_meta"] = {"engine": "param", "degraded": True, "reason": res.get("reason", ""),
+                           "strategy": strategy, "strategy_src": strategy_src}
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -1074,7 +1502,7 @@ def v2_daily(day: str | None = None, limit: int = 12):
             "ts": r[0], "kp_id": r[1],
             "kp_name": (kp_meta.get(r[1]) or {}).get("name") or (r[1] or "—"),
             "qtype": r[2], "mode": r[3], "result": r[4],
-            "stmt": _safe_trunc_math(meta.get("stmt_summary") or meta.get("raw") or "", 60),
+            "stmt": _safe_trunc_math(meta.get("stmt_summary") or meta.get("raw") or "", 140),
             "rule": meta.get("rule"),
         })
     return {"day": day, "items": items}
@@ -1091,22 +1519,18 @@ def v2_patterns(limit: int = 8):
     kp_meta = _kp_meta()
     conn = get_conn()
     try:
-        rows = conn.execute(
-            "SELECT kp, attribution FROM attempt_events "
-            "WHERE result IN ('wrong','partial') AND mode IN ('answer','selfassess') "
-            "AND attribution IS NOT NULL"
-        ).fetchall()
+        # 用 project_mistakes（归因已按 override 合并）而非裸事件——
+        # 与错因分布/复习卡口径一致（judge 复验发现的口径矛盾根因）
+        mistakes = mem2.project_mistakes(conn, limit=500)
     finally:
         conn.close()
     agg = {}
-    for kp, at in rows:
+    for mk in mistakes:
+        kp = mk.get("kp")
         if not kp:
             continue
         a = agg.setdefault(kp, Counter())
-        try:
-            t = (json.loads(at) or {}).get("type") if at and at.startswith("{") else at
-        except Exception:
-            t = at
+        t = (mk.get("attribution") or {}).get("type") if isinstance(mk.get("attribution"), dict) else None
         a[t or "未归因"] += 1
     out = []
     for kp, cnt in agg.items():
@@ -1132,4 +1556,17 @@ def v2_patterns(limit: int = 8):
             "source": "rule",
         })
     out.sort(key=lambda x: -x["wrong_count"])
+    # 物化（2026-09-12）：规则模式卡写入 patterns 表（source=rule, 未确认）——
+    # 表从此不再是空壳，为 LLM 精炼蒸馏器与 confirmed 工作流备好数据底座
+    conn = get_conn()
+    try:
+        for it in out[:int(limit)]:
+            try:
+                mem2.patterns_set(conn, it["pack_id"], it["kp"],
+                                  f"{it['pattern']}。{it['advice']}",
+                                  source="rule", confirmed=False)
+            except Exception:  # noqa: BLE001 —— 物化失败不影响读时聚合返回
+                pass
+    finally:
+        conn.close()
     return {"items": out[:int(limit)]}

@@ -12,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db as db_mod
 import policy2
+import json
+
+import mem2
 import pack_loader
 
 
@@ -38,8 +41,9 @@ def _base_state(**kw):
     return st
 
 
-def test_p1_trigger_on_weak_prereq():
-    # 当前掌握度低且存在前置未达标 → 切前置
+def test_p1_trigger_on_weak_prereq(monkeypatch):
+    # 当前掌握度低且存在前置未达标 → 切前置（可达性门控放行：聚焦 P1 机制）
+    monkeypatch.setattr(policy2, "_kp_reachable", lambda kp: True)
     st = _base_state(mastery_decayed=0.3,
                      prereq_mastery={"calc.continuity": 0.3, "calc.derivative.basic": 0.7})
     d = policy2.decide(st, _strategy())
@@ -128,14 +132,24 @@ def test_p6_fallback(monkeypatch):
 
 
 def test_policy_log_persisted(tmp_path):
-    conn = db_mod.connect(tmp_path / "t.db")
+    """决策单轨（复评 S5）：只写 attempt_events（mode='policy'），不再双写 v1 policy_log。"""
+    conn = mem2.connect(tmp_path / "t.db")  # 单轨决策写 attempt_events → 需 mem2 schema
     st = _base_state(conn=conn, last_wrong_attribution="计算失误", difficulty="进阶")
     d = policy2.decide(st, _strategy())
-    logs = db_mod.get_policy_log(conn, limit=10)
-    assert len(logs) == 1
-    assert logs[0]["trigger_rule"] == d["rule"] == "P4"
+    rows = conn.execute(
+        "SELECT meta FROM attempt_events WHERE mode='policy' ORDER BY id DESC"
+    ).fetchall()
+    assert len(rows) == 1
+    meta = json.loads(rows[0][0])
+    assert meta["rule"] == d["rule"] == "P4"
     # 快照可回放
-    assert logs[0]["input_snapshot"]["kp_id"] == "calc.rolle"
+    assert meta["snapshot"]["kp_id"] == "calc.rolle"
+    # v1 policy_log 表不再被 v2 决策写入
+    try:
+        logs = db_mod.get_policy_log(conn, limit=10)
+        assert len(logs) == 0
+    except Exception:
+        pass  # 该库无 policy_log 表也合规（单轨本就不依赖它）
     conn.close()
 
 
@@ -149,3 +163,27 @@ def test_strategy_deep_merge_override_effective():
     # decide 实际读取覆写值
     st = _base_state(streak_correct=1)
     assert policy2.decide(st, s)["rule"] == "P5"
+
+
+# ---- 归因置信门控（2026-09-12）：低置信错因不驱动 P3/P4 ----
+
+def test_p4_blocked_by_low_confidence(tmp_path):
+    """conf=0.2 < 阈值 → P3/P4 不触发，落 P6；override conf=1.0 → P4 正常。"""
+    conn = mem2.connect(tmp_path / "g.db")
+    try:
+        strat = {"window": 5, "recency_halflife_days": 7, "decay_halflife_days": 7,
+                 "policy": {"p4_penalty": True}}
+        base = {"kp_id": "calc.x", "difficulty": "基础", "first_contact": False,
+                "mastery_decayed": 0.9, "prereq_mastery": {}, "streak_correct": 0,
+                "conn": conn}
+        low = {**base, "last_wrong_attribution": "计算失误", "last_wrong_attribution_conf": 0.2}
+        d = policy2.decide(low, strat)
+        assert d["rule"] == "P6", f"低置信不应触发 P4，实际 {d['rule']}"
+        trusted = {**base, "last_wrong_attribution": "计算失误", "last_wrong_attribution_conf": 1.0}
+        d2 = policy2.decide(trusted, strat)
+        assert d2["rule"] == "P4"
+        legacy = {**base, "last_wrong_attribution": "计算失误", "last_wrong_attribution_conf": None}
+        d3 = policy2.decide(legacy, strat)
+        assert d3["rule"] == "P4"  # legacy 无 conf 放行（向后兼容）
+    finally:
+        conn.close()

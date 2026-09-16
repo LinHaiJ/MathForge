@@ -1,5 +1,5 @@
 """player 端到端复演检查：在 MATHFORGE_DEMO=1 + 全新 mathforge.db 的服务上，
-按 ui/player.html 的确切 fetch 序列走一遍，验证零 API 与策略叙事链。
+按 v1/ui/player.html 的确切 fetch 序列走一遍，验证零 API 与策略叙事链。
 
 录制前程序化预检（对应 demo_checklist.md）。用法：
   1) MATHFORGE_DEMO=1 rm -f mathforge.db
@@ -51,7 +51,7 @@ def main() -> int:
         ok = ok and cond
 
     # 1 摄取
-    md = (Path(__file__).resolve().parent.parent / "ui" / "demo_assets" / "高数-微分中值定理.md").read_text(encoding="utf-8")
+    md = (Path(__file__).resolve().parent.parent / "v1" / "ui" / "demo_assets" / "高数-微分中值定理.md").read_text(encoding="utf-8")
     ing = post("/ingest", {"md": md, "source": "高数-微分中值定理.md"})
     kps = [k["kp"] for k in ing["data"]["kp_list"]]
     check("ingest", len(kps) >= 3, f"{kps}")

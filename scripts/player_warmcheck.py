@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v1"))  # db/eval 迁入 v1/
 import db  # noqa: E402
 from attribute import attribute_error  # noqa: E402
 from generate import generate_question  # noqa: E402

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1216">
 <title>MathForge v2 · 今日</title>
 <link rel="stylesheet" href="/ui/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="/ui2/style.css">
@@ -17,6 +18,14 @@
     <button class="ps" data-page="facts">足迹统计</button>
   </nav>
   <div class="checkin" id="checkin" title="今日打卡（本地连续天数）"></div>
+  <select id="profile-sel" class="profile-sel" title="学习者档案：每人一个独立记忆库">
+    <option value="">默认档案</option>
+    <option value="p1">同学A</option>
+    <option value="p2">同学B</option>
+    <option value="p3">同学C</option>
+    <option value="p4">同学D</option>
+    <option value="p5">同学E</option>
+  </select>
 </header>
 
 <main>
@@ -29,6 +38,9 @@
       <button id="intent-go" class="primary">出题</button>
       <div id="intent-hint" class="hint" hidden></div>
     </div>
+
+    <!-- 今日计划（已练最弱优先，冷启动给零 API 族保底；冷启动态隐藏让位推荐卡） -->
+    <div id="plan-wrap" class="plan-wrap" hidden></div>
 
     <!-- 复习清单（练习入口）：按 高数/线代/概率 分类可筛；卡片按掌握度最低在前 -->
     <div class="subj-filter" id="subjFilter">
@@ -48,10 +60,23 @@
       <div id="fill-area">
         <div class="row">
           <input id="latex-input" type="text" maxlength="400"
-                 placeholder="输入你的答案（LaTeX 或普通文本，如 pi/2、Rational(1,2)）">
+                 placeholder="输入答案：1/2、pi、x^2、√、\frac{a}{b}、y = x + 1 均可">
           <button id="submit-answer" class="primary">提交</button>
         </div>
         <div class="preview" id="preview"></div>
+        <div class="photo-row">
+          <button id="photo-btn" class="ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="2" y="6" width="20" height="14" rx="3" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"/>
+              <path d="M8 6l1.2-2h5.6L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            拍照识别答案
+          </button>
+          <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+          <span class="mini" id="photo-status"></span>
+        </div>
+        <div id="photo-panel" hidden></div>
       </div>
 
       <div id="sol-area" hidden>
@@ -95,6 +120,7 @@
 <footer class="foot">MathForge v2 · 交互形态参考 summer-checkin（MIT）</footer>
 
 <script src="/ui/vendor/katex/katex.min.js"></script>
-<script src="/ui2/app.js"></script>
+<meta http-equiv="Cache-Control" content="no-cache" />
+<script src="/ui2/app.js?v=20260916c"></script>
 </body>
 </html>

@@ -55,6 +55,14 @@ def _attrib_type(attr):
     return attr
 
 
+def _attrib_conf(attr):
+    """提取归因置信度（None=未知/legacy 数据，不参与门控）。"""
+    if isinstance(attr, dict):
+        conf = attr.get("conf")
+        return float(conf) if isinstance(conf, (int, float)) else None
+    return None
+
+
 def build_context(conn, pack: dict, kp_id: str, strategy: dict | None = None,
                   mem=None) -> dict:
     """预算化上下文（≤4k token）：kp 元信息 + 前置掌握度 + 当前掌握度 + 最近错题(≤3)。"""
@@ -114,6 +122,7 @@ def prepare_decision_state(conn, pack: dict, kp_id: str, difficulty: str,
             cur if isinstance(cur, (int, float)) else None)
         streak = cur.get("streak_correct", 0) if isinstance(cur, dict) else 0
         attrib = _attrib_type(cur.get("last_attribution")) if isinstance(cur, dict) else None
+        attrib_conf = _attrib_conf(cur.get("last_attribution")) if isinstance(cur, dict) else None
         first = kp_id not in allp
         prereq_mastery = {}
         for pre in prereqs:
@@ -125,6 +134,7 @@ def prepare_decision_state(conn, pack: dict, kp_id: str, difficulty: str,
         mastery_decayed = None
         streak = 0
         attrib = None
+        attrib_conf = None
         first = True
         prereq_mastery = {pre: None for pre in prereqs}
         degraded = True
@@ -139,6 +149,7 @@ def prepare_decision_state(conn, pack: dict, kp_id: str, difficulty: str,
         "prereq_mastery": prereq_mastery,
         "first_contact": first,
         "last_wrong_attribution": attrib,
+        "last_wrong_attribution_conf": attrib_conf,
         "streak_correct": streak,
         "difficulty": difficulty,
         "steps": steps,

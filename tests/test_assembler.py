@@ -81,8 +81,10 @@ def test_prepare_state_contains_prereq_mastery():
     assert st["prereq_mastery"]["calc.continuity"] == 0.3
 
 
-def test_p1_deadcode_fixed_via_assembler():
+def test_p1_deadcode_fixed_via_assembler(monkeypatch):
     # 集成证据：assembler 提供真实 prerequisites → decide 真命中 P1（v1 死代码已修复）
+    # （demo 可达性门控放行：本测试聚焦 P1 机制本身）
+    monkeypatch.setattr(policy2, "_kp_reachable", lambda kp: True)
     pack = _calc_pack()
     mem = _MemStub(allp={
         "calc.rolle": {"decayed_value": 0.3},       # 当前掌握度 <0.4

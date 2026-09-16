@@ -36,7 +36,9 @@ _SYSTEM = """你是考研数学错题归因器。把学生错答归入且仅归�
 
 def attribute_error(statement: str, student_answer: str, standard_answer: str,
                     analysis: str | None = None) -> dict:
-    """LLM 归因；失败时返回低置信占位（不阻塞练习闭环）。"""
+    """LLM 归因；失败时返回「未归因」占位（不阻塞练习闭环，且不污染记忆——
+    「未归因」不命中任何 P 规则，UI 引导人工修正；2026-09-12 P0 前旧默认「计算失误」
+    会把演示模式全部错答系统性记成计算失误，已废弃）。"""
     user = f"题干：{statement}\n学生答案：{student_answer}\n标准答案：{standard_answer}"
     if analysis:
         user += f"\n参考解析：{analysis[:400]}"
@@ -48,4 +50,5 @@ def attribute_error(statement: str, student_answer: str, standard_answer: str,
             return d
     except Exception:  # noqa: BLE001
         pass
-    return {"attribution": "计算失误", "confidence": 0.0, "reason": "归因服务不可用，占位默认（可人工修正）"}
+    return {"attribution": "未归因", "confidence": 0.0,
+            "reason": "归因服务不可用（无 LLM key/演示模式），请人工点选修正"}

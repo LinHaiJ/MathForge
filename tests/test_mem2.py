@@ -9,8 +9,9 @@ import uuid
 
 import pytest
 
-from mathforge import mem2
-from mathforge.db import DB_PATH as V1_DB_PATH, decayed as v1_decayed
+# 目录重组（2026-09-12）：mem2 → v2/，db → v1/；conftest 已注册路径，改用 flat import
+import mem2
+from db import DB_PATH as V1_DB_PATH, decayed as v1_decayed
 
 DAY = 86400.0
 
@@ -55,10 +56,10 @@ def test_append_and_project_n1(tmp_path):
     _append(conn, result="correct", ts=1000.0)
     m = mem2.project_mastery(conn, "kp1", at=1000.0)
     assert m is not None
-    assert m["value"] == pytest.approx(1.0)
+    assert m["value"] == pytest.approx(0.7)  # 首答封顶 0.7（学生复评：防虚假安全感）
     assert m["n"] == 1
     assert m["last_ts"] == 1000.0
-    assert m["decayed_value"] == pytest.approx(1.0)  # at==last_ts → 无衰减
+    assert m["decayed_value"] == pytest.approx(0.7)  # at==last_ts → 无衰减
     conn.close()
 
 
@@ -102,12 +103,12 @@ def test_decayed_value_aligns_v1(tmp_path):
     _append(conn, result="correct", ts=T0)
     at = T0 + 7.0 * DAY  # 经过一个半衰期
     m = mem2.project_mastery(conn, "kp1", at=at)
-    expected = v1_decayed(1.0, T0, at)  # v1: 1.0 * 0.5**1 = 0.5
+    expected = v1_decayed(0.7, T0, at)  # 首答封顶 0.7 → 0.7 * 0.5**1 = 0.35
     assert m["decayed_value"] == pytest.approx(expected)
-    assert m["decayed_value"] == pytest.approx(0.5)
-    # 不衰减情形
+    assert m["decayed_value"] == pytest.approx(0.35)
+    # 不衰减情形（封顶后仍 0.7）
     m0 = mem2.project_mastery(conn, "kp1", at=T0)
-    assert m0["decayed_value"] == pytest.approx(1.0)
+    assert m0["decayed_value"] == pytest.approx(0.7)
     conn.close()
 
 

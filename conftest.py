@@ -10,3 +10,8 @@ _here = os.path.dirname(os.path.abspath(__file__))
 _parent = os.path.dirname(_here)  # D:\腾讯冲刺\作品A
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
+# 目录重组（2026-09-12）：v1/=纯v1 模块，v2/=纯v2 模块；共用链仍在仓库根
+for _sub in ("v1", "v2"):
+    _d = os.path.join(_here, _sub)
+    if os.path.isdir(_d) and _d not in sys.path:
+        sys.path.insert(0, _d)

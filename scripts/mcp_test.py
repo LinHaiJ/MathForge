@@ -13,7 +13,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client  # noqa: E402
 
 async def main() -> int:
     params = StdioServerParameters(command=sys.executable,
-                                   args=[str(Path(__file__).resolve().parent.parent / "mcp_server.py")])
+                                   args=[str(Path(__file__).resolve().parent.parent / "v1" / "mcp_server.py")])
     lines = []
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as s:

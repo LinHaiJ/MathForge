@@ -1,288 +1,744 @@
 [
-  {
-    "id": "la.det.calc",
-    "name": "行列式计算",
-    "section": "行列式",
-    "level": 1,
-    "parents": [],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["数字行列式", "抽象行列式"],
-    "pitfalls": ["行列式与矩阵数乘混淆"]
-  },
-  {
-    "id": "la.matrix.basic",
-    "name": "矩阵运算与逆矩阵",
-    "section": "矩阵",
-    "level": 1,
-    "parents": [],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["矩阵乘法", "逆矩阵", "矩阵方程"],
-    "pitfalls": ["AB=0 推出 A=0 或 B=0（错）"]
-  },
-  {
-    "id": "la.matrix.rank",
-    "name": "矩阵的秩",
-    "section": "矩阵/秩",
-    "level": 2,
-    "parents": ["la.det.calc", "la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "high",
-    "typical_forms": ["求秩", "含参矩阵秩讨论"],
-    "pitfalls": ["初等变换不改变秩的误用"]
-  },
-  {
-    "id": "la.eigen",
-    "name": "特征值与特征向量",
-    "section": "特征值",
-    "level": 2,
-    "parents": ["la.det.calc", "la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "high",
-    "typical_forms": ["求特征值特征向量", "对角化", "相似对角化判定"],
-    "pitfalls": ["特征向量零向量误收", "不同特征值特征向量正交遗忘"]
-  },
-  {
-    "id": "la.det.property",
-    "name": "行列式性质",
-    "section": "行列式",
-    "level": 1,
-    "parents": ["la.det.calc"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["转置不变", "换行变号", "倍加不变", "拆分性质"],
-    "pitfalls": ["换行/倍乘符号与系数混淆"]
-  },
-  {
-    "id": "la.det.expand",
-    "name": "行列式展开",
-    "section": "行列式",
-    "level": 2,
-    "parents": ["la.det.calc"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["按行/列展开", "代数余子式"],
-    "pitfalls": ["余子式与代数余子式符号"]
-  },
-  {
-    "id": "la.det.abstract",
-    "name": "抽象行列式",
-    "section": "行列式",
-    "level": 2,
-    "parents": ["la.det.property"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "mid",
-    "typical_forms": ["|AB|=|A||B|", "|kA|=k^n|A|"],
-    "pitfalls": ["|A+B|≠|A|+|B|"]
-  },
-  {
-    "id": "la.matrix.op",
-    "name": "矩阵运算",
-    "section": "矩阵",
-    "level": 1,
-    "parents": ["la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["加减乘", "转置", "幂"],
-    "pitfalls": ["乘法不交换 AB≠BA"]
-  },
-  {
-    "id": "la.matrix.inv",
-    "name": "逆矩阵",
-    "section": "矩阵",
-    "level": 2,
-    "parents": ["la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["伴随矩阵法", "初等变换法", "(AB)^-1"],
-    "pitfalls": ["(AB)^-1=B^-1 A^-1 顺序错"]
-  },
-  {
-    "id": "la.matrix.block",
-    "name": "分块矩阵",
-    "section": "矩阵",
-    "level": 2,
-    "parents": ["la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["分块求逆", "分块乘法"],
-    "pitfalls": ["分块乘法维度错配"]
-  },
-  {
-    "id": "la.matrix.elem",
-    "name": "初等变换与初等矩阵",
-    "section": "矩阵",
-    "level": 2,
-    "parents": ["la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["行变换化阶梯形", "等价标准形"],
-    "pitfalls": ["左乘右乘混淆"]
-  },
-  {
-    "id": "la.rank.equation",
-    "name": "秩的不等式与等式",
-    "section": "矩阵/秩",
-    "level": 3,
-    "parents": ["la.matrix.rank"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "mid",
-    "typical_forms": ["r(A+B)≤r(A)+r(B)", "r(AB)≥r(A)+r(B)-n"],
-    "pitfalls": ["秩不等式方向记反"]
-  },
-  {
-    "id": "la.vector.group",
-    "name": "向量组线性相关性",
-    "section": "向量",
-    "level": 1,
-    "parents": ["la.matrix.basic"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["线性相关判定", "定义法"],
-    "pitfalls": ["部分组相关≠整体相关"]
-  },
-  {
-    "id": "la.vector.rank",
-    "name": "向量组的秩",
-    "section": "向量",
-    "level": 2,
-    "parents": ["la.vector.group"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["求向量组秩", "等价向量组"],
-    "pitfalls": ["向量组秩与矩阵秩混淆"]
-  },
-  {
-    "id": "la.vector.maxindep",
-    "name": "极大线性无关组",
-    "section": "向量",
-    "level": 2,
-    "parents": ["la.vector.rank"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["求解极大无关组", "表出关系"],
-    "pitfalls": ["极大无关组不唯一误以为错"]
-  },
-  {
-    "id": "la.lineq.judge",
-    "name": "线性方程组解的判定",
-    "section": "线性方程组",
-    "level": 1,
-    "parents": ["la.matrix.rank", "la.vector.group"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["齐次解判定", "非齐次解判定"],
-    "pitfalls": ["r(A)=r(Ā) 判定条件反"]
-  },
-  {
-    "id": "la.lineq.structure",
-    "name": "线性方程组解的结构",
-    "section": "线性方程组",
-    "level": 2,
-    "parents": ["la.lineq.judge"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["基础解系", "通解构造"],
-    "pitfalls": ["通解=特解+齐次通解结构错"]
-  },
-  {
-    "id": "la.lineq.homo",
-    "name": "齐次方程组基础解系",
-    "section": "线性方程组",
-    "level": 2,
-    "parents": ["la.lineq.judge"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["基础解系个数 n-r(A)"],
-    "pitfalls": ["解系个数误为 r(A)"]
-  },
-  {
-    "id": "la.eigen.vec",
-    "name": "特征向量与相似对角化",
-    "section": "特征值",
-    "level": 3,
-    "parents": ["la.eigen"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["相似对角化条件", "求 P 与 Λ"],
-    "pitfalls": ["P 的列须对应特征值顺序"]
-  },
-  {
-    "id": "la.eigen.symmetric",
-    "name": "实对称矩阵",
-    "section": "特征值",
-    "level": 3,
-    "parents": ["la.eigen.vec"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["正交相似对角化", "正交矩阵 Q"],
-    "pitfalls": ["漏施密特正交化"]
-  },
-  {
-    "id": "la.quadratic.form",
-    "name": "二次型与合同",
-    "section": "二次型",
-    "level": 2,
-    "parents": ["la.eigen.symmetric"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["标准形", "规范形", "合同变换"],
-    "pitfalls": ["合同与相似混淆"]
-  },
-  {
-    "id": "la.quadratic.positive",
-    "name": "正定二次型",
-    "section": "二次型",
-    "level": 3,
-    "parents": ["la.quadratic.form"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "mid",
-    "typical_forms": ["顺序主子式判定", "特征值判定"],
-    "pitfalls": ["半正定≠正定"]
-  }
+ {
+  "id": "la.det.calc",
+  "name": "行列式计算",
+  "section": "行列式",
+  "level": 1,
+  "parents": [],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "数字行列式",
+   "抽象行列式"
+  ],
+  "pitfalls": [
+   "行列式与矩阵数乘混淆"
+  ],
+  "usage_count": 34,
+  "source_categories": [
+   "线性代数 / 行列式 / 具体行列式计算 / 范德蒙",
+   "线性代数 / 行列式 / 具体行列式计算 / 行和/列和相等(含 ab 型)",
+   "线性代数 / 行列式 / 具体行列式计算 / 三对角线行列式",
+   "线性代数 / 行列式 / 具体行列式计算 / 爪形",
+   "线性代数 / 行列式 / 具体行列式计算 / 其他",
+   "线性代数 / 行列式 / 具体行列式计算 / X型",
+   "线性代数 / 行列式 / 具体行列式计算 / 么字型",
+   "线性代数 / 行列式 / 多项式 $f(x)$ 以行列式形式给出 / $f(x)=0$ 根的个数",
+   "线性代数 / 行列式 / Cramer法则"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.basic",
+  "name": "矩阵运算与逆矩阵",
+  "section": "矩阵",
+  "level": 1,
+  "parents": [],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "矩阵乘法",
+   "逆矩阵",
+   "矩阵方程"
+  ],
+  "pitfalls": [
+   "AB=0 推出 A=0 或 B=0（错）"
+  ],
+  "usage_count": 65,
+  "source_categories": [
+   "线性代数 / 矩阵 / 逆 / 抽象逆相关",
+   "线性代数 / 矩阵 / 逆 / (不)可逆的判定与证明",
+   "线性代数 / 矩阵 / 伴随矩阵 / 伴随性质",
+   "线性代数 / 矩阵 / 伴随矩阵 / 伴随等于转置或本身",
+   "线性代数 / 矩阵 / 其他题型 / 已知 AB 求 BA",
+   "线性代数 / 矩阵 / AB=口 / AB = C",
+   "线性代数 / 矩阵 / 其他题型 / 求各行(列)元素之和",
+   "线性代数 / 矩阵 / 其他题型 / AB = BA",
+   "线性代数 / 矩阵 / 其他题型 / 正交矩阵",
+   "线性代数 / 矩阵 / AB=口 / AB = E"
+  ],
+  "source_categories_more": 3,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.rank",
+  "name": "矩阵的秩",
+  "section": "矩阵/秩",
+  "level": 2,
+  "parents": [
+   "la.det.calc",
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "high",
+  "typical_forms": [
+   "求秩",
+   "含参矩阵秩讨论"
+  ],
+  "pitfalls": [
+   "初等变换不改变秩的误用"
+  ],
+  "usage_count": 54,
+  "source_categories": [
+   "线性代数 / 矩阵 / 秩 / 求秩及证明秩",
+   "线性代数 / 矩阵 / 分块矩阵 / 分块矩阵秩",
+   "线性代数 / 矩阵 / AB=口 / AB = O",
+   "线性代数 / 矩阵 / 其他题型 / 矩阵等价",
+   "线性代数 / 矩阵 / 秩 / 已知秩确定参数",
+   "线性代数 / 矩阵 / 秩 / 利用秩推理"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.eigen",
+  "name": "特征值与特征向量",
+  "section": "特征值",
+  "level": 2,
+  "parents": [
+   "la.det.calc",
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "high",
+  "typical_forms": [
+   "求特征值特征向量",
+   "对角化",
+   "相似对角化判定"
+  ],
+  "pitfalls": [
+   "特征向量零向量误收",
+   "不同特征值特征向量正交遗忘"
+  ],
+  "usage_count": 64,
+  "source_categories": [
+   "线性代数 / 特征值与特征向量 / 特征值与特征向量 / 求特征值特征向量 / 抽象矩阵",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 求实对称矩阵 A",
+   "线性代数 / 特征值与特征向量 / 特征值与特征向量 / 特征相关推理",
+   "线性代数 / 特征值与特征向量 / 特征值与特征向量 / 特征相关证明",
+   "线性代数 / 特征值与特征向量 / 特征值与特征向量 / 求特征值特征向量 / 具体矩阵",
+   "线性代数 / 特征值与特征向量 / 相似 / 相似相关证明"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.det.property",
+  "name": "行列式性质",
+  "section": "行列式",
+  "level": 1,
+  "parents": [
+   "la.det.calc"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "转置不变",
+   "换行变号",
+   "倍加不变",
+   "拆分性质"
+  ],
+  "pitfalls": [
+   "换行/倍乘符号与系数混淆"
+  ],
+  "usage_count": 22,
+  "source_categories": [
+   "线性代数 / 行列式 / (代数)余子式相关问题 / (代数)余子式求和",
+   "线性代数 / 行列式 / 具体行列式计算 / 行和/列和相等(含 ab 型)",
+   "线性代数 / 行列式 / 多项式 $f(x)$ 以行列式形式给出 / $f(x)=0$ 根的个数",
+   "线性代数 / 行列式 / (代数)余子式相关问题 / 给出余子式相关信息定参"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.det.expand",
+  "name": "行列式展开",
+  "section": "行列式",
+  "level": 2,
+  "parents": [
+   "la.det.calc"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "按行/列展开",
+   "代数余子式"
+  ],
+  "pitfalls": [
+   "余子式与代数余子式符号"
+  ],
+  "usage_count": 19,
+  "source_categories": [
+   "线性代数 / 行列式 / (代数)余子式相关问题 / (代数)余子式求和",
+   "线性代数 / 行列式 / 多项式 $f(x)$ 以行列式形式给出 / 确定 $f(x)$ 中 $x$ 某次方的系数",
+   "线性代数 / 行列式 / (代数)余子式相关问题 / 给出余子式相关信息定参"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.det.abstract",
+  "name": "抽象行列式",
+  "section": "行列式",
+  "level": 2,
+  "parents": [
+   "la.det.property"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "|AB|=|A||B|",
+   "|kA|=k^n|A|"
+  ],
+  "pitfalls": [
+   "|A+B|≠|A|+|B|"
+  ],
+  "usage_count": 67,
+  "source_categories": [
+   "线性代数 / 行列式 / 抽象行列式计算",
+   "线性代数 / 行列式 / 多项式 $f(x)$ 以行列式形式给出 / 确定 $f(x)$ 中 $x$ 某次方的系数"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.op",
+  "name": "矩阵运算",
+  "section": "矩阵",
+  "level": 1,
+  "parents": [
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "加减乘",
+   "转置",
+   "幂"
+  ],
+  "pitfalls": [
+   "乘法不交换 AB≠BA"
+  ],
+  "usage_count": 50,
+  "source_categories": [
+   "线性代数 / 矩阵 / 高次幂",
+   "线性代数 / 矩阵 / AB=口 / AB = O",
+   "线性代数 / 矩阵 / AB=口 / AB = C",
+   "线性代数 / 矩阵 / 矩阵分解 / 正定矩阵的分解",
+   "线性代数 / 矩阵 / 其他题型 / 矩阵化 E",
+   "线性代数 / 线性方程组 / 矩阵方程 / 二阶",
+   "线性代数 / 矩阵 / 其他题型 / 给出矩阵等式推导相关结论"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.inv",
+  "name": "逆矩阵",
+  "section": "矩阵",
+  "level": 2,
+  "parents": [
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "伴随矩阵法",
+   "初等变换法",
+   "(AB)^-1"
+  ],
+  "pitfalls": [
+   "(AB)^-1=B^-1 A^-1 顺序错"
+  ],
+  "usage_count": 77,
+  "source_categories": [
+   "线性代数 / 线性方程组 / 矩阵方程 / 可逆",
+   "线性代数 / 矩阵 / 逆 / 抽象逆相关",
+   "线性代数 / 矩阵 / 逆 / (不)可逆的判定与证明",
+   "线性代数 / 矩阵 / 伴随矩阵 / 伴随性质",
+   "线性代数 / 矩阵 / 伴随矩阵 / 伴随等于转置或本身",
+   "线性代数 / 矩阵 / 逆 / 具体矩阵求逆",
+   "线性代数 / 矩阵 / 其他题型 / 矩阵化 E",
+   "线性代数 / 线性方程组 / 矩阵方程 / 二阶",
+   "线性代数 / 矩阵 / AB=口 / AB = E",
+   "线性代数 / 线性方程组 / 矩阵方程 / 不可逆 / 含参数讨论完再解"
+  ],
+  "source_categories_more": 1,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.block",
+  "name": "分块矩阵",
+  "section": "矩阵",
+  "level": 2,
+  "parents": [
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "分块求逆",
+   "分块乘法"
+  ],
+  "pitfalls": [
+   "分块乘法维度错配"
+  ],
+  "usage_count": 15,
+  "source_categories": [
+   "线性代数 / 矩阵 / 分块矩阵 / 分块矩阵秩",
+   "线性代数 / 矩阵 / 分块矩阵 / 分块矩阵的逆和伴随"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.matrix.elem",
+  "name": "初等变换与初等矩阵",
+  "section": "矩阵",
+  "level": 2,
+  "parents": [
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "行变换化阶梯形",
+   "等价标准形"
+  ],
+  "pitfalls": [
+   "左乘右乘混淆"
+  ],
+  "usage_count": 17,
+  "source_categories": [
+   "线性代数 / 矩阵 / 初等变换与初等矩阵",
+   "线性代数 / 矩阵 / 其他题型 / 矩阵等价"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.rank.equation",
+  "name": "秩的不等式与等式",
+  "section": "矩阵/秩",
+  "level": 3,
+  "parents": [
+   "la.matrix.rank"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "r(A+B)≤r(A)+r(B)",
+   "r(AB)≥r(A)+r(B)-n"
+  ],
+  "pitfalls": [
+   "秩不等式方向记反"
+  ],
+  "usage_count": 6,
+  "source_categories": [
+   "线性代数 / 矩阵 / 秩 / 利用秩推理",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 求基础解系中向量个数"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.vector.group",
+  "name": "向量组线性相关性",
+  "section": "向量",
+  "level": 1,
+  "parents": [
+   "la.matrix.basic"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "线性相关判定",
+   "定义法"
+  ],
+  "pitfalls": [
+   "部分组相关≠整体相关"
+  ],
+  "usage_count": 74,
+  "source_categories": [
+   "线性代数 / 向量 / 线性相关与无关 / 证明线性无关",
+   "线性代数 / 向量 / 线性表示 / 根据线性表示情况确定参数并将向量线性表示",
+   "线性代数 / 向量 / 线性相关与无关 / 多个向量组相关无关的关系",
+   "线性代数 / 向量 / 线性表示 / 根据线性表示推理",
+   "线性代数 / 向量 / 线性相关与无关 / 线性相关无关概念",
+   "线性代数 / 向量 / 线性相关与无关 / 根据相关无关确定参数",
+   "线性代数 / 向量 / 线性表示 / 线性表示的判定",
+   "线性代数 / 向量 / 线性相关与无关 / 讨论相关无关",
+   "线性代数 / 向量 / 线性表示 / 共同线性表示",
+   "线性代数 / 向量 / 向量有关计算"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.vector.rank",
+  "name": "向量组的秩",
+  "section": "向量",
+  "level": 2,
+  "parents": [
+   "la.vector.group"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "求向量组秩",
+   "等价向量组"
+  ],
+  "pitfalls": [
+   "向量组秩与矩阵秩混淆"
+  ],
+  "usage_count": 8,
+  "source_categories": [
+   "线性代数 / 向量 / 向量组等价",
+   "线性代数 / 向量 / 向量有关计算"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.vector.maxindep",
+  "name": "极大线性无关组",
+  "section": "向量",
+  "level": 2,
+  "parents": [
+   "la.vector.rank"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "求解极大无关组",
+   "表出关系"
+  ],
+  "pitfalls": [
+   "极大无关组不唯一误以为错"
+  ],
+  "usage_count": 6,
+  "source_categories": [
+   "线性代数 / 向量 / 极大无关组",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 已知一个基础解系,证明另一个向量组为基础解系"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.lineq.judge",
+  "name": "线性方程组解的判定",
+  "section": "线性方程组",
+  "level": 1,
+  "parents": [
+   "la.matrix.rank",
+   "la.vector.group"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "齐次解判定",
+   "非齐次解判定"
+  ],
+  "pitfalls": [
+   "r(A)=r(Ā) 判定条件反"
+  ],
+  "usage_count": 98,
+  "source_categories": [
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 具体矩阵",
+   "线性代数 / 线性方程组 / 矩阵方程 / 可逆",
+   "线性代数 / 线性方程组 / 解的判定 / 判断解的情况",
+   "线性代数 / 线性方程组 / 解的判定 / 已知解的情况确定参数",
+   "线性代数 / 线性方程组 / 矩阵方程 / 不可逆 / 不含参数直接解",
+   "线性代数 / 向量 / 线性表示 / 线性表示的判定",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知向量关系求通解",
+   "线性代数 / 线性方程组 / 解的关系 / 公共解 / 已知[I][II]具体形式",
+   "线性代数 / 线性方程组 / 解的关系 / 同解 / 已知同解反求参数并求同解",
+   "线性代数 / 线性方程组 / 解的关系 / 同解 / 证明"
+  ],
+  "source_categories_more": 5,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.lineq.structure",
+  "name": "线性方程组解的结构",
+  "section": "线性方程组",
+  "level": 2,
+  "parents": [
+   "la.lineq.judge"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "基础解系",
+   "通解构造"
+  ],
+  "pitfalls": [
+   "通解=特解+齐次通解结构错"
+  ],
+  "usage_count": 100,
+  "source_categories": [
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 具体矩阵",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 求基础解系(通解)",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知解向量的线性组合求通解",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知一方程组通解,求另一方程组通解",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 根据其他已知条件求通解",
+   "线性代数 / 线性方程组 / 解的关系 / 两个方程组其他解的关系",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知向量关系求通解",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知特征求通解",
+   "线性代数 / 线性方程组 / 已知方程组的解推导其他",
+   "线性代数 / 线性方程组 / 解的关系 / 公共解 / 已知[I][II]具体形式"
+  ],
+  "source_categories_more": 11,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.lineq.homo",
+  "name": "齐次方程组基础解系",
+  "section": "线性方程组",
+  "level": 2,
+  "parents": [
+   "la.lineq.judge"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "基础解系个数 n-r(A)"
+  ],
+  "pitfalls": [
+   "解系个数误为 r(A)"
+  ],
+  "usage_count": 25,
+  "source_categories": [
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 求基础解系(通解)",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 具体矩阵",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 求基础解系中向量个数",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 已知一个基础解系,求另一个基础解系",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 已知若干齐次解,判断其他向量是否为齐次解",
+   "线性代数 / 线性方程组 / 方程组求解 / 齐次 / 抽象矩阵 / 已知一个基础解系,证明另一个向量组为基础解系"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.eigen.vec",
+  "name": "特征向量与相似对角化",
+  "section": "特征值",
+  "level": 3,
+  "parents": [
+   "la.eigen"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "相似对角化条件",
+   "求 P 与 Λ"
+  ],
+  "pitfalls": [
+   "P 的列须对应特征值顺序"
+  ],
+  "usage_count": 72,
+  "source_categories": [
+   "线性代数 / 特征值与特征向量 / 相似对角化 / 求相似对角化的可逆阵 P 及对角阵 Λ",
+   "线性代数 / 特征值与特征向量 / 相似 / 根据相似确定参数或推理",
+   "线性代数 / 特征值与特征向量 / 相似 / 求可逆矩阵 P，使得 P^{-1}AP = B",
+   "线性代数 / 特征值与特征向量 / 相似对角化 / 可相似对角化相关讨论及证明",
+   "线性代数 / 特征值与特征向量 / 相似对角化 / 相似对角化充要条件",
+   "线性代数 / 特征值与特征向量 / 相似对角化 / 判断是否可以相似对角化",
+   "线性代数 / 特征值与特征向量 / 相似 / 判断相似",
+   "线性代数 / 线性方程组 / 方程组求解 / 非齐次 / 抽象矩阵 / 已知特征求通解",
+   "线性代数 / 特征值与特征向量 / 相似 / 相似相关证明",
+   "线性代数 / 特征值与特征向量 / 相似对角化 / 相似对角化概念"
+  ],
+  "source_categories_more": 2,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.eigen.symmetric",
+  "name": "实对称矩阵",
+  "section": "特征值",
+  "level": 3,
+  "parents": [
+   "la.eigen.vec"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "正交相似对角化",
+   "正交矩阵 Q"
+  ],
+  "pitfalls": [
+   "漏施密特正交化"
+  ],
+  "usage_count": 61,
+  "source_categories": [
+   "线性代数 / 二次型 / 标准型 / 正交变换",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 求实对称矩阵 A",
+   "线性代数 / 二次型 / 求二次型最值",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 求正交矩阵 Q / 常规三阶题",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 实对称矩阵相关推理",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 求正交矩阵 Q / 四阶题",
+   "线性代数 / 二次型 / 一个二次型变成另一个二次型，求变换矩阵 / 正交变换求变换矩阵",
+   "线性代数 / 矩阵 / 矩阵分解 / 实对称矩阵分解",
+   "线性代数 / 特征值与特征向量 / 实对称矩阵 / 求正交矩阵 Q / 两个矩阵同时正交相似对角化"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.quadratic.form",
+  "name": "二次型与合同",
+  "section": "二次型",
+  "level": 2,
+  "parents": [
+   "la.eigen.symmetric"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "标准形",
+   "规范形",
+   "合同变换"
+  ],
+  "pitfalls": [
+   "合同与相似混淆"
+  ],
+  "usage_count": 111,
+  "source_categories": [
+   "线性代数 / 二次型 / 标准型 / 正交变换",
+   "线性代数 / 二次型 / 合同",
+   "线性代数 / 二次型 / 规范形",
+   "线性代数 / 二次型 / 正负惯性指数 / 求正负惯性指数",
+   "线性代数 / 二次型 / 求二次型最值",
+   "线性代数 / 二次型 / 二次型的秩或矩阵",
+   "线性代数 / 二次型 / 一个二次型变成另一个二次型，求变换矩阵 / 可逆变换求变换矩阵",
+   "线性代数 / 二次型 / 求二次型的解",
+   "线性代数 / 二次型 / 标准型 / 可逆变换",
+   "线性代数 / 二次型 / 求可逆矩阵  $  \\mathbf{P}  $ ，使得  $  \\mathbf{A} = \\mathbf{P}^\\top \\mathbf{E} \\mathbf{P}  $"
+  ],
+  "source_categories_more": 4,
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "la.quadratic.positive",
+  "name": "正定二次型",
+  "section": "二次型",
+  "level": 3,
+  "parents": [
+   "la.quadratic.form"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "顺序主子式判定",
+   "特征值判定"
+  ],
+  "pitfalls": [
+   "半正定≠正定"
+  ],
+  "usage_count": 25,
+  "source_categories": [
+   "线性代数 / 二次型 / 正定 / 已知正定反求参数",
+   "线性代数 / 二次型 / 正定 / 正定相关证明",
+   "线性代数 / 矩阵 / 矩阵分解 / 正定矩阵的分解",
+   "线性代数 / 二次型 / 正定 / 其他"
+  ],
+  "aligned_at": "2026-09-15"
+ }
 ]

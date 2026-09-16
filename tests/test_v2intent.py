@@ -163,9 +163,14 @@ def test_answer_meta_enhancement(db_env):
 
 
 def test_db_clean(db_env):
-    """测试全部跑在临时库；真实 mathforge.db 应保持 attempt_events 0 行。"""
+    """测试全部跑在临时库；真实 mathforge.db 的行数快照必须不变。
+
+    2026-09-12 起真实库允许合法非测试数据（复评走查/用户自用），断言从「0 行」
+    放宽为「本测试会话内不新增」——基线在模块导入时捕获（见 tests/test_v2api.py 同名守卫）。"""
     import sqlite3
     real = sqlite3.connect(os.path.join(ROOT, "mathforge.db"))
     n = real.execute("SELECT COUNT(*) FROM attempt_events").fetchone()[0]
     real.close()
-    assert n == 0
+    import test_v2api as _guard
+    assert n == _guard.BASELINE_N, f"真实库 attempt_events 行数漂移：{_guard.BASELINE_N} → {n}"
+

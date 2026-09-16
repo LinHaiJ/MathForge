@@ -99,3 +99,22 @@ def test_invalid_syntax_garbage():
     except Exception:
         return  # 抛异常并被捕获，符合预期
     assert result is False
+
+
+# ---- normalize_expr（2026-09-12，AI-PM 评审 B3：输入归一化层） ----
+
+def test_normalize_unicode_math():
+    from verify import normalize_expr
+    assert normalize_expr("π/2") == "pi/2"
+    assert normalize_expr("x²") == "x^(2)"
+    assert normalize_expr("2×3 − 1") == "2*3 - 1"
+    assert normalize_expr("√x") == "sqrt(x)"
+    assert normalize_expr("（１＋２）") == "(1+2)"
+
+
+def test_check_answer_accepts_human_forms():
+    from verify import check_answer
+    assert check_answer("π/2", "pi/2") is True          # Unicode π 直接判对
+    assert check_answer("0.5", "1/2") is True           # 小数等价
+    assert check_answer("x²", "x^2") is True            # 上标数字
+    assert check_answer("2×3", "6") is True             # 乘号

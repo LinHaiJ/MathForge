@@ -4,5 +4,15 @@ __pycache__/
 *.db
 cache/
 .pytest_cache/
+.pytest_tmp*/
 题集/
 KNOWN_ISSUES.md
+ESCALATION.md
+.edge_p*/
+_ui2_*.png
+_ui2_*.png.tmp
+_shot_driver*.html
+profiles/
+
+_*.txt
+_*.log

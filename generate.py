@@ -138,6 +138,15 @@ _RENDER_FLAWS = [r"1x\^", r"\+\s*0(?![\.\d])", r"（[^（）]*为常数）", r"\
                  r"1\\(sin|cos|tan|cot|log|ln)"]
 
 
+def render_flaws(statement: str) -> "str | None":
+    """渲染瑕疵检查（2026-09-12：包族直出路径也须过守卫，见 v2api/_try_pack_family）。
+    命中返回首个瑕疵的模式说明；干净返回 None。"""
+    for pat in _RENDER_FLAWS:
+        if re.search(pat, statement or ""):
+            return pat
+    return None
+
+
 def _unknown_placeholders(text: str, params: dict) -> set[str]:
     """找出未代入的 {name} 占位符；跳过 LaTeX 命令参数（\\begin{pmatrix}、\\mathbf{A} 等）。
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "v1"))  # db/eval 迁入 v1/
 
 from eval import m1_green_success  # noqa: E402
 

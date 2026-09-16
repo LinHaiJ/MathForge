@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "v1"))  # eval 迁入 v1/（2026-09-12 重组）
 
 ARM_SCRIPT = ROOT / "scripts" / "_ab_arm.py"
 
@@ -42,7 +43,7 @@ def run_arm(arm: str) -> dict:
 def main() -> int:
     r6_path = ROOT / "cache" / "eval_R6.json"
     if not r6_path.exists():
-        raise SystemExit("缺 cache/eval_R6.json（A 臂基线）——先跑 python eval.py R6 big40")
+        raise SystemExit("缺 cache/eval_R6.json（A 臂基线）——先跑 python v1/eval.py R6 big40")
     r6 = json.load(open(r6_path, encoding="utf-8"))
     a_m1 = r6["M1"]
     b_m1 = run_arm("B")

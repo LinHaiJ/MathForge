@@ -460,6 +460,9 @@ def build_events(
 def _try_import_mem2():
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
+    _v2 = os.path.join(ROOT, "v2")
+    if _v2 not in sys.path:
+        sys.path.insert(0, _v2)  # mem2 迁入 v2/
     try:
         import mem2  # type: ignore
     except Exception:

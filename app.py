@@ -6,6 +6,16 @@
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _PkgPath
+
+# v1/ v2/ 目录注册进 sys.path：模块内保持 flat import（import db / import mem2），
+# 物理目录分离与导入兼容解耦（重组说明见 docs/2026-09-12_夜间优化/）。
+for _d in ("v1", "v2"):
+    _p = _PkgPath(__file__).resolve().parent / _d
+    if _p.is_dir() and str(_p) not in _sys.path:
+        _sys.path.insert(0, str(_p))
+
 import sqlite3
 from pathlib import Path
 
@@ -28,7 +38,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-_UI_DIR = Path(__file__).resolve().parent / "ui"
+_UI_DIR = Path(__file__).resolve().parent / "v1" / "ui"
 if _UI_DIR.exists():
     app.mount("/ui", StaticFiles(directory=str(_UI_DIR), html=True), name="ui")
 
@@ -426,6 +436,8 @@ def strategy_board():
 
 
 from v2api import router as v2_router  # noqa: E402 —— v2 填空闭环接线层（只挂载，不改 v1 端点）
+# 每人一库：X-MF-Profile 档案路由在 v2api._ProfileRoute 内处理（路由级 contextvar，
+# 不走 app 中间件——BaseHTTPMiddleware 的下游任务孵化时序会吞掉 contextvar）
 app.include_router(v2_router, prefix="/v2")
 
 # ui2/ 静态服务（T6 v2 四视图界面 + 填空表达式输入面板；独立目录，零改动 v1 端点）

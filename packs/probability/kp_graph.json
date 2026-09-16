@@ -1,249 +1,604 @@
 [
-  {
-    "id": "prob.classical",
-    "name": "古典概型与排列组合",
-    "section": "概率论/基础",
-    "level": 1,
-    "parents": [],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["古典概型计数", "分房问题"],
-    "pitfalls": ["等可能假设不满足仍用古典概型"]
-  },
-  {
-    "id": "prob.total_bayes",
-    "name": "全概率与贝叶斯公式",
-    "section": "概率论/条件概率",
-    "level": 2,
-    "parents": ["prob.classical"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "high",
-    "typical_forms": ["全概率公式", "贝叶斯后验", "多阶段事件"],
-    "pitfalls": ["完备事件组划分遗漏"]
-  },
-  {
-    "id": "prob.expectation",
-    "name": "期望与方差",
-    "section": "概率论/数字特征",
-    "level": 2,
-    "parents": [],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "high",
-    "typical_forms": ["分布求期望方差", "线性性质"],
-    "pitfalls": ["Var(aX)=a²Var(X) 系数平方漏"]
-  },
-  {
-    "id": "prob.geometric",
-    "name": "几何概型",
-    "section": "概率论/基础",
-    "level": 1,
-    "parents": ["prob.classical"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["面积比", "长度比", "体积比"],
-    "pitfalls": ["测度选取与区域错"]
-  },
-  {
-    "id": "prob.condition",
-    "name": "条件概率",
-    "section": "概率论/条件概率",
-    "level": 1,
-    "parents": ["prob.classical"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["P(A|B)", "乘法公式"],
-    "pitfalls": ["P(A|B)≠P(B|A)"]
-  },
-  {
-    "id": "prob.independence",
-    "name": "事件独立性",
-    "section": "概率论/条件概率",
-    "level": 2,
-    "parents": ["prob.condition"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["两事件独立", "相互独立"],
-    "pitfalls": ["独立≠互斥"]
-  },
-  {
-    "id": "prob.rv.dist",
-    "name": "分布函数",
-    "section": "概率论/一维随机变量",
-    "level": 1,
-    "parents": ["prob.classical"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["F(x) 性质", "由密度求分布函数"],
-    "pitfalls": ["分布函数右连续漏"]
-  },
-  {
-    "id": "prob.rv.discrete",
-    "name": "离散型随机变量",
-    "section": "概率论/一维随机变量",
-    "level": 1,
-    "parents": ["prob.rv.dist"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["分布律", "0-1/二项/泊松分布"],
-    "pitfalls": ["Σp_i=1 未验证"]
-  },
-  {
-    "id": "prob.rv.continuous",
-    "name": "连续型随机变量",
-    "section": "概率论/一维随机变量",
-    "level": 1,
-    "parents": ["prob.rv.dist"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["密度函数", "均匀/指数/正态分布"],
-    "pitfalls": ["密度积分=1 漏验证"]
-  },
-  {
-    "id": "prob.rv.func",
-    "name": "随机变量函数分布",
-    "section": "概率论/一维随机变量",
-    "level": 2,
-    "parents": ["prob.rv.discrete", "prob.rv.continuous"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "mid",
-    "typical_forms": ["分布函数法", "公式法（单调可微）"],
-    "pitfalls": ["非单调未分段处理"]
-  },
-  {
-    "id": "prob.multi.joint",
-    "name": "多维联合分布",
-    "section": "概率论/多维随机变量",
-    "level": 1,
-    "parents": ["prob.rv.discrete", "prob.rv.continuous"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["联合分布律", "联合密度"],
-    "pitfalls": ["联合密度非零域画错"]
-  },
-  {
-    "id": "prob.multi.margin",
-    "name": "边缘分布",
-    "section": "概率论/多维随机变量",
-    "level": 1,
-    "parents": ["prob.multi.joint"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["边缘分布律", "边缘密度"],
-    "pitfalls": ["积分求边缘时积分域错"]
-  },
-  {
-    "id": "prob.multi.indep",
-    "name": "多维独立性",
-    "section": "概率论/多维随机变量",
-    "level": 2,
-    "parents": ["prob.multi.margin", "prob.independence"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["独立判定 f(x,y)=f_X(x)f_Y(y)"],
-    "pitfalls": ["独立≠不相关"]
-  },
-  {
-    "id": "prob.variance",
-    "name": "方差",
-    "section": "概率论/数字特征",
-    "level": 2,
-    "parents": ["prob.expectation"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["Var(X)", "方差性质 Var(aX+b)=a²Var(X)"],
-    "pitfalls": ["方差非负性/系数平方漏"]
-  },
-  {
-    "id": "prob.cov.corr",
-    "name": "协方差与相关系数",
-    "section": "概率论/数字特征",
-    "level": 2,
-    "parents": ["prob.expectation"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["Cov(X,Y)", "相关系数 ρ"],
-    "pitfalls": ["不相关≠独立"]
-  },
-  {
-    "id": "prob.law.large",
-    "name": "大数定律与中心极限定理",
-    "section": "概率论/数字特征",
-    "level": 3,
-    "parents": ["prob.expectation"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["切比雪夫大数定律", "中心极限定理近似"],
-    "pitfalls": ["中心极限定理正态近似条件漏"]
-  },
-  {
-    "id": "prob.stat.quantity",
-    "name": "统计量",
-    "section": "概率论/数理统计",
-    "level": 1,
-    "parents": ["prob.rv.continuous"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "mid",
-    "typical_forms": ["样本均值", "样本方差"],
-    "pitfalls": ["样本方差除 n-1 而非 n"]
-  },
-  {
-    "id": "prob.estimate",
-    "name": "参数估计",
-    "section": "概率论/数理统计",
-    "level": 2,
-    "parents": ["prob.stat.quantity"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "basic",
-    "exam_freq": "high",
-    "typical_forms": ["矩估计", "极大似然估计"],
-    "pitfalls": ["似然函数漏连乘积"]
-  },
-  {
-    "id": "prob.hypothesis",
-    "name": "假设检验",
-    "section": "概率论/数理统计",
-    "level": 2,
-    "parents": ["prob.estimate"],
-    "verifiable": true,
-    "qtypes": ["fill", "solution"],
-    "difficulty_floor": "mid",
-    "exam_freq": "low",
-    "typical_forms": ["单/双尾检验", "两类错误"],
-    "pitfalls": ["弃真(α)与取伪(β)混淆"]
-  }
+ {
+  "id": "prob.classical",
+  "name": "古典概型与排列组合",
+  "section": "概率论/基础",
+  "level": 1,
+  "parents": [],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "古典概型计数",
+   "分房问题"
+  ],
+  "pitfalls": [
+   "等可能假设不满足仍用古典概型"
+  ],
+  "usage_count": 31,
+  "source_categories": [
+   "概率统计 / 事件与概率 / 概率 / 概率的计算",
+   "概率统计 / 事件与概率 / 三大概型 / 古典概型",
+   "概率统计 / 事件与概率 / 三大概型 / 伯努利概型",
+   "概率统计 / 事件与概率 / 概率 / 概率性质 / 其他",
+   "概率统计 / 事件与概率 / 概率 / 概率性质 / 对概率的认识",
+   "概率统计 / 事件与概率 / 概率 / 概率性质 / 概率放缩"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.total_bayes",
+  "name": "全概率与贝叶斯公式",
+  "section": "概率论/条件概率",
+  "level": 2,
+  "parents": [
+   "prob.classical"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "high",
+  "typical_forms": [
+   "全概率公式",
+   "贝叶斯后验",
+   "多阶段事件"
+  ],
+  "pitfalls": [
+   "完备事件组划分遗漏"
+  ],
+  "usage_count": 4,
+  "source_categories": [
+   "概率统计 / 事件与概率 / 全概率和贝叶斯"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.expectation",
+  "name": "期望与方差",
+  "section": "概率论/数字特征",
+  "level": 2,
+  "parents": [],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "high",
+  "typical_forms": [
+   "分布求期望方差",
+   "线性性质"
+  ],
+  "pitfalls": [
+   "Var(aX)=a²Var(X) 系数平方漏"
+  ],
+  "usage_count": 28,
+  "source_categories": [
+   "概率统计 / 统计初步 / 求统计量的数字特征",
+   "概率统计 / 数字特征 / 期望与方差 / 泊松分布",
+   "概率统计 / 数字特征 / 期望与方差 / 期望",
+   "概率统计 / 数字特征 / 期望与方差 / 求正态分布绝对值的期望方差",
+   "概率统计 / 数字特征 / 期望与方差 / 二项分布",
+   "概率统计 / 数字特征 / 期望与方差 /  Pascal 分布的期望方差",
+   "概率统计 / 数字特征 / 期望与方差 / 伽马/凑正态",
+   "概率统计 / 数字特征 / 期望与方差 / 轮换对称与最值函数",
+   "概率统计 / 数字特征 / 期望与方差 / 线性组合"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.geometric",
+  "name": "几何概型",
+  "section": "概率论/基础",
+  "level": 1,
+  "parents": [
+   "prob.classical"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "面积比",
+   "长度比",
+   "体积比"
+  ],
+  "pitfalls": [
+   "测度选取与区域错"
+  ],
+  "usage_count": 4,
+  "source_categories": [
+   "概率统计 / 事件与概率 / 三大概型 / 几何概型"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.condition",
+  "name": "条件概率",
+  "section": "概率论/条件概率",
+  "level": 1,
+  "parents": [
+   "prob.classical"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "P(A|B)",
+   "乘法公式"
+  ],
+  "pitfalls": [
+   "P(A|B)≠P(B|A)"
+  ],
+  "usage_count": 19,
+  "source_categories": [
+   "概率统计 / 事件与概率 / 概率 / 概率的计算",
+   "概率统计 / 事件与概率 / 概率 / 概率性质 / 条件概率",
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 条件概率分布相关",
+   "概率统计 / 二维随机变量 / 二维连续型随机变量 / 联合 边缘 条件概率密度 / 已知边缘条件求联合"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.independence",
+  "name": "事件独立性",
+  "section": "概率论/条件概率",
+  "level": 2,
+  "parents": [
+   "prob.condition"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "两事件独立",
+   "相互独立"
+  ],
+  "pitfalls": [
+   "独立≠互斥"
+  ],
+  "usage_count": 4,
+  "source_categories": [
+   "概率统计 / 事件与概率 / 独立"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.rv.dist",
+  "name": "分布函数",
+  "section": "概率论/一维随机变量",
+  "level": 1,
+  "parents": [
+   "prob.classical"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "F(x) 性质",
+   "由密度求分布函数"
+  ],
+  "pitfalls": [
+   "分布函数右连续漏"
+  ],
+  "usage_count": 15,
+  "source_categories": [
+   "概率统计 / 一维随机变量 / 其他题型 / 求 X 取值的概率",
+   "概率统计 / 一维随机变量 / 分布函数 / 求分布函数 / 离散",
+   "概率统计 / 一维随机变量 / 分布函数 / 已知分布函数",
+   "概率统计 / 一维随机变量 / 分布函数 / 求分布函数 / 连续",
+   "概率统计 / 一维随机变量 / 其他题型 / F(x) f(x)判定 / 复合",
+   "概率统计 / 一维随机变量 / 其他题型 / F(x) f(x)判定 / 运算"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.rv.discrete",
+  "name": "离散型随机变量",
+  "section": "概率论/一维随机变量",
+  "level": 1,
+  "parents": [
+   "prob.rv.dist"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "分布律",
+   "0-1/二项/泊松分布"
+  ],
+  "pitfalls": [
+   "Σp_i=1 未验证"
+  ],
+  "usage_count": 16,
+  "source_categories": [
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 已知概率分布",
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 求概率分布",
+   "概率统计 / 一维随机变量 / 分布函数 / 求分布函数 / 离散",
+   "概率统计 / 一维随机变量 / 其他题型 / 泊松分布"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.rv.continuous",
+  "name": "连续型随机变量",
+  "section": "概率论/一维随机变量",
+  "level": 1,
+  "parents": [
+   "prob.rv.dist"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "密度函数",
+   "均匀/指数/正态分布"
+  ],
+  "pitfalls": [
+   "密度积分=1 漏验证"
+  ],
+  "usage_count": 24,
+  "source_categories": [
+   "概率统计 / 一维随机变量 / 正态分布 / 标准化",
+   "概率统计 / 一维随机变量 / 一维连续型随机变量函数的分布 / 初等函数",
+   "概率统计 / 一维随机变量 / 正态分布 / 确定参数",
+   "概率统计 / 一维随机变量 / 正态分布 / 对称性",
+   "概率统计 / 一维随机变量 / 分布函数 / 求分布函数 / 连续",
+   "概率统计 / 一维随机变量 / 其他题型 / 无记忆性",
+   "概率统计 / 一维随机变量 / 一维连续型随机变量函数的分布 / 分段函数"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.rv.func",
+  "name": "随机变量函数分布",
+  "section": "概率论/一维随机变量",
+  "level": 2,
+  "parents": [
+   "prob.rv.discrete",
+   "prob.rv.continuous"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "分布函数法",
+   "公式法（单调可微）"
+  ],
+  "pitfalls": [
+   "非单调未分段处理"
+  ],
+  "usage_count": 21,
+  "source_categories": [
+   "概率统计 / 一维随机变量 / 一维连续型随机变量函数的分布 / 初等函数",
+   "概率统计 / 二维随机变量 / 二维随机变量函数的分布 / 二维连续型随机变量函数的分布",
+   "概率统计 / 一维随机变量 / 其他题型 / 求最值函数取值的概率",
+   "概率统计 / 一维随机变量 / 其他题型 / F(x) f(x)判定 / 复合",
+   "概率统计 / 一维随机变量 / 一维连续型随机变量函数的分布 / 分段函数",
+   "概率统计 / 二维随机变量 / 二维随机变量函数的分布 / 离散➕连续型随机变量函数的分布",
+   "概率统计 / 一维随机变量 / 一维连续型随机变量函数的分布 / F(X)"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.multi.joint",
+  "name": "多维联合分布",
+  "section": "概率论/多维随机变量",
+  "level": 1,
+  "parents": [
+   "prob.rv.discrete",
+   "prob.rv.continuous"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "联合分布律",
+   "联合密度"
+  ],
+  "pitfalls": [
+   "联合密度非零域画错"
+  ],
+  "usage_count": 35,
+  "source_categories": [
+   "概率统计 / 二维随机变量 / 二维正态分布",
+   "概率统计 / 二维随机变量 / 联合分布函数",
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 已知概率分布",
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 求概率分布",
+   "概率统计 / 二维随机变量 / 二维随机变量函数的分布 / 二维连续型随机变量函数的分布",
+   "概率统计 / 二维随机变量 / 二维连续型随机变量 / 联合 边缘 条件概率密度 / 已知联合求边缘/条件",
+   "概率统计 / 二维随机变量 / 二维离散型随机变量 / 条件概率分布相关",
+   "概率统计 / 二维随机变量 / 二维随机变量函数的分布 / 离散➕连续型随机变量函数的分布",
+   "概率统计 / 二维随机变量 / 二维随机变量函数的分布 / 二维离散型随机变量函数的分布",
+   "概率统计 / 二维随机变量 / 二维连续型随机变量 / 求 XY 取值概率 / 直接给出联合概率密度"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.multi.margin",
+  "name": "边缘分布",
+  "section": "概率论/多维随机变量",
+  "level": 1,
+  "parents": [
+   "prob.multi.joint"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "边缘分布律",
+   "边缘密度"
+  ],
+  "pitfalls": [
+   "积分求边缘时积分域错"
+  ],
+  "usage_count": 4,
+  "source_categories": [
+   "概率统计 / 二维随机变量 / 二维连续型随机变量 / 联合 边缘 条件概率密度 / 已知联合求边缘/条件",
+   "概率统计 / 二维随机变量 / 二维连续型随机变量 / 联合 边缘 条件概率密度 / 已知边缘条件求联合"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.multi.indep",
+  "name": "多维独立性",
+  "section": "概率论/多维随机变量",
+  "level": 2,
+  "parents": [
+   "prob.multi.margin",
+   "prob.independence"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "独立判定 f(x,y)=f_X(x)f_Y(y)"
+  ],
+  "pitfalls": [
+   "独立≠不相关"
+  ],
+  "usage_count": 5,
+  "source_categories": [
+   "概率统计 / 数字特征 / 相关与独立判定"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.variance",
+  "name": "方差",
+  "section": "概率论/数字特征",
+  "level": 2,
+  "parents": [
+   "prob.expectation"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "Var(X)",
+   "方差性质 Var(aX+b)=a²Var(X)"
+  ],
+  "pitfalls": [
+   "方差非负性/系数平方漏"
+  ],
+  "usage_count": 23,
+  "source_categories": [
+   "概率统计 / 数字特征 / 期望与方差 / 方差",
+   "概率统计 / 数字特征 / 期望与方差 / 泊松分布",
+   "概率统计 / 数字特征 / 期望与方差 / 求正态分布绝对值的期望方差",
+   "概率统计 / 数字特征 / 期望与方差 / 二项分布",
+   "概率统计 / 数字特征 / 期望与方差 /  Pascal 分布的期望方差",
+   "概率统计 / 数字特征 / 期望与方差 / 伽马/凑正态",
+   "概率统计 / 数字特征 / 期望与方差 / 轮换对称与最值函数",
+   "概率统计 / 数字特征 / 期望与方差 / 线性组合"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.cov.corr",
+  "name": "协方差与相关系数",
+  "section": "概率论/数字特征",
+  "level": 2,
+  "parents": [
+   "prob.expectation"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "Cov(X,Y)",
+   "相关系数 ρ"
+  ],
+  "pitfalls": [
+   "不相关≠独立"
+  ],
+  "usage_count": 14,
+  "source_categories": [
+   "概率统计 / 数字特征 / 相关与独立判定",
+   "概率统计 / 数字特征 / 相关系数 / 求相关系数 / 利用定义",
+   "概率统计 / 数字特征 / 协方差 / 分配",
+   "概率统计 / 数字特征 / 协方差 / 连续",
+   "概率统计 / 数字特征 / 协方差 / 离散",
+   "概率统计 / 数字特征 / 相关系数 / 已知相关系数的逆问题"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.law.large",
+  "name": "大数定律与中心极限定理",
+  "section": "概率论/数字特征",
+  "level": 3,
+  "parents": [
+   "prob.expectation"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "切比雪夫大数定律",
+   "中心极限定理近似"
+  ],
+  "pitfalls": [
+   "中心极限定理正态近似条件漏"
+  ],
+  "usage_count": 8,
+  "source_categories": [
+   "概率统计 / 大数定律中心极限定理 / 切比雪夫不等式",
+   "概率统计 / 大数定律中心极限定理 / 中心极限定理",
+   "概率统计 / 大数定律中心极限定理 / 大数定律"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.stat.quantity",
+  "name": "统计量",
+  "section": "概率论/数理统计",
+  "level": 1,
+  "parents": [
+   "prob.rv.continuous"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "mid",
+  "typical_forms": [
+   "样本均值",
+   "样本方差"
+  ],
+  "pitfalls": [
+   "样本方差除 n-1 而非 n"
+  ],
+  "usage_count": 18,
+  "source_categories": [
+   "概率统计 / 统计初步 / 求统计量的数字特征",
+   "概率统计 / 统计初步 / 求统计量的抽样分布 / T",
+   "概率统计 / 统计初步 / 求统计量的抽样分布 / 卡方",
+   "概率统计 / 统计初步 / 求统计量的抽样分布 / 其他",
+   "概率统计 / 统计初步 / 求统计量的抽样分布 / F",
+   "概率统计 / 统计初步 / 最值函数 / 最大",
+   "概率统计 / 统计初步 / 最值函数 / 最小"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.estimate",
+  "name": "参数估计",
+  "section": "概率论/数理统计",
+  "level": 2,
+  "parents": [
+   "prob.stat.quantity"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "basic",
+  "exam_freq": "high",
+  "typical_forms": [
+   "矩估计",
+   "极大似然估计"
+  ],
+  "pitfalls": [
+   "似然函数漏连乘积"
+  ],
+  "usage_count": 21,
+  "source_categories": [
+   "概率统计 / 统计初步 / 区间估计与假设检验",
+   "概率统计 / 统计初步 / 估计 / 最大似然估计 / 单总体 / 连续总体 / 有驻点",
+   "概率统计 / 统计初步 / 估计 / 矩估计",
+   "概率统计 / 统计初步 / 估计 / 最大似然估计 / 单总体 / 离散总体",
+   "概率统计 / 统计初步 / 估计 / 最大似然估计 / 单总体 / 连续总体 / 求平方的最大似然估计"
+  ],
+  "aligned_at": "2026-09-15"
+ },
+ {
+  "id": "prob.hypothesis",
+  "name": "假设检验",
+  "section": "概率论/数理统计",
+  "level": 2,
+  "parents": [
+   "prob.estimate"
+  ],
+  "verifiable": true,
+  "qtypes": [
+   "fill",
+   "solution"
+  ],
+  "difficulty_floor": "mid",
+  "exam_freq": "low",
+  "typical_forms": [
+   "单/双尾检验",
+   "两类错误"
+  ],
+  "pitfalls": [
+   "弃真(α)与取伪(β)混淆"
+  ],
+  "usage_count": 9,
+  "source_categories": [
+   "概率统计 / 统计初步 / 区间估计与假设检验"
+  ],
+  "aligned_at": "2026-09-15"
+ }
 ]

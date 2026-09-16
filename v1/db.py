@@ -12,7 +12,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent / "mathforge.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "mathforge.db"
 HALF_LIFE_DAYS = 7.0  # PRD §4 经验参数[待评测校准]
 
 _SCHEMA = """

@@ -20,7 +20,7 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 仓库根（packs/skills/exams 留根）
 PACKS_DIR = os.path.join(ROOT, "packs")
 CORE_SKILL = os.path.join(ROOT, "skills", "_core", "examiner-core.md")
 EXAMS_DIR = os.path.join(ROOT, "exams")

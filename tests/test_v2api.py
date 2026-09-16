@@ -5,7 +5,7 @@
 # 隔离纪律：
 #   - MATHFORGE_DEMO=1 强制零 API（缓存未命中即降级，绝不出网）
 #   - MATHFORGE_V2_DB 指向临时库，真实 mathforge.db 全程不写；
-#     收尾 test_real_db_untouched 断言真实库 attempt_events 仍为 0 行（多余行只清本轮新增 id）
+#     收尾 test_real_db_untouched 断言真实库 attempt_events 行数快照不变（2026-09-12 起允许合法非测试数据）
 
 import json
 import os
@@ -28,6 +28,7 @@ REAL_DB = os.path.join(ROOT, "mathforge.db")
 
 VALID_RULES = {"P1", "P2", "P3", "P4", "P5", "P6"}
 ATTR_CLASSES = {"概念混淆", "计算失误", "方法选错", "审题错误"}
+ATTR_OBSERVABLE = ATTR_CLASSES | {"未归因"}  # 演示/无 key 时 attribute_error 兜底为「未归因」(P0 2026-09-12)
 
 
 def _real_db_baseline() -> tuple[int, int]:
@@ -55,6 +56,7 @@ def client():
     if os.path.exists(TMP_DB):
         os.remove(TMP_DB)
     os.environ["MATHFORGE_V2_DB"] = TMP_DB
+    os.environ["MATHFORGE_PROFILES_DIR"] = TMP_DIR  # 档案库也隔离到临时目录（PM 复评 P0）
 
     from fastapi.testclient import TestClient
 
@@ -174,13 +176,29 @@ def _turn(client, kp_id="calc.rolle"):
     return d
 
 
+_SEEN_FP: set = set()  # 模块级已答指纹集合（同题去重语义下拿新题用）
+
+
+def _turn_fresh(client, kp_id="calc.rolle", tries=10):
+    """拿一道「本模块还没答过」的新题（跨题去重语义下的测试基建）。"""
+    for _ in range(tries):
+        t = _turn(client, kp_id)
+        fp = t["question"].get("question_fp", "")
+        if fp and fp not in _SEEN_FP:
+            _SEEN_FP.add(fp)
+            return t
+        if not fp:  # 无指纹的旧客户端形态：直接返回
+            return t
+    return _turn(client, kp_id)  # 兜底（全重复时概率性接受）
+
+
 def test_answer_correct_closes_loop(client):
     t = _turn(client)
     q = t["question"]
     r = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
         "student_answer": q["answer_sympy"], "standard_answer": q["answer_sympy"],
-        "statement_md": q["statement_md"], "analysis": q.get("analysis"),
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "analysis": q.get("analysis"),
         "difficulty": "基础",
     })
     assert r.status_code == 200
@@ -193,16 +211,17 @@ def test_answer_correct_closes_loop(client):
 
 
 def test_answer_wrong_llm_attribution(client):
-    """答错未给 override → 走 attribute_error（演示模式返回兜底四类标签，不阻塞闭环）。"""
+    """答错未给 override → 走 attribute_error（演示模式兜底「未归因」，不阻塞闭环，
+    且不再假称「计算失误」污染记忆——P0 2026-09-12）。"""
     t = _turn(client)
     q = t["question"]
     d = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
         "student_answer": "999999", "standard_answer": q["answer_sympy"],
-        "statement_md": q["statement_md"], "difficulty": "基础",
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "difficulty": "基础",
     }).json()
     assert d["correct"] is False
-    assert d["attribution"] in ATTR_CLASSES
+    assert d["attribution"] in ATTR_OBSERVABLE
     assert d["overridden"] is False
     assert d["decision"]["rule"] in VALID_RULES
 
@@ -213,7 +232,7 @@ def test_answer_attribution_override_wins(client):
     d = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
         "student_answer": "-12345", "standard_answer": q["answer_sympy"],
-        "statement_md": q["statement_md"], "attribution_override": "计算失误",
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "attribution_override": "计算失误",
         "difficulty": "进阶",
     }).json()
     assert d["correct"] is False
@@ -244,7 +263,7 @@ def test_events_persisted_in_attempt_events(client):
     assert [r["result"] for r in rows] == ["correct", "wrong", "wrong"]
     assert all(r["kp"] == "calc.rolle" and r["pack"] == "calculus" for r in rows)
     assert all(r["qtype"] == "fill" and r["sim"] == 0 for r in rows)
-    assert json.loads(rows[1]["attribution"])["type"] in ATTR_CLASSES
+    assert json.loads(rows[1]["attribution"])["type"] in ATTR_OBSERVABLE
 
 
 def test_review_and_stats_with_data(client):
@@ -254,7 +273,7 @@ def test_review_and_stats_with_data(client):
     assert len(items) >= 1
     kp_item = next(i for i in items if i["kp"] == "calc.rolle")
     assert kp_item["n"] == 3
-    assert kp_item["last_attribution"]["type"] in ATTR_CLASSES
+    assert kp_item["last_attribution"]["type"] in ATTR_OBSERVABLE
     vals = [i["decayed_value"] or 0.0 for i in items]
     assert vals == sorted(vals)          # 掌握度最低优先
 
@@ -351,7 +370,8 @@ def test_selfassess_three_grades_map_and_event(client):
     r1 = client.post("/v2/selfassess", json={**base, "student_steps": steps,
                                              "grade": "会"}).json()
     assert r1["ok"] and r1["result"] == "correct"
-    assert r1["mastery_after"]["n"] == 1 and r1["mastery_after"]["value"] == 1.0
+    assert r1["mastery_after"]["n"] == 1
+    assert r1["mastery_after"]["value"] == 0.7  # 首答封顶 0.7（学生复评：防虚假安全感）
     # 部分会 → partial
     r2 = client.post("/v2/selfassess", json={**base, "student_steps": steps,
                                              "grade": "部分会"}).json()
@@ -383,7 +403,7 @@ def test_selfassess_attribution_carried(client):
         "pack_id": d["pack_id"], "kp": d["kp"]["id"], "qtype": "solution",
         "student_steps": ["步骤一", "步骤二"], "grade": "不会",
         "attribution": "概念混淆",
-        "statement_md": q["statement_md"], "analysis": q.get("analysis"),
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "analysis": q.get("analysis"),
         "standard_answer": q["answer_sympy"],
     }).json()
     assert r["ok"] and r["attribution"] == "概念混淆"
@@ -414,7 +434,7 @@ def test_steps_attribute_degraded_in_demo(client):
     d = _turn_solution(client)
     q = d["question"]
     r = client.post("/v2/steps-attribute", json={
-        "statement_md": q["statement_md"], "analysis": q.get("analysis"),
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "analysis": q.get("analysis"),
         "standard_answer": q["answer_sympy"], "steps": ["x=1", "x=2"], "kp": d["kp"]["id"],
     })
     assert r.status_code == 200
@@ -426,29 +446,18 @@ def test_steps_attribute_degraded_in_demo(client):
 # 收尾：真实库零污染
 # --------------------------------------------------------------------------- #
 def test_real_db_untouched(client):
-    """真实 mathforge.db 的 attempt_events 必须回到 0 行（红线）。
+    """真实 mathforge.db 的 attempt_events 行数在测试前后不变（红线：测试绝不写真实库）。
 
-    本轮全程写临时库，故只需断言；若发现本轮新增行（id > 基线），先清理再断言。
+    2026-09-12 起真实库允许含有合法的非测试数据（复评走查/用户自用产生的事件），
+    故断言从「必须 0 行」放宽为「快照不变」：基线在模块导入时捕获，测试结束后必须持平。
     """
     conn = sqlite3.connect(REAL_DB)
     try:
-        exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='attempt_events'"
-        ).fetchone()
-        if exists:
-            leaked = conn.execute(
-                "SELECT COUNT(*) FROM attempt_events WHERE id > ?", (BASELINE_MAX_ID,)
-            ).fetchone()[0]
-            if leaked:  # 清理逻辑：只删本轮新增，绝不动基线行
-                conn.execute("DELETE FROM attempt_events WHERE id > ?", (BASELINE_MAX_ID,))
-                conn.commit()
-            n = conn.execute("SELECT COUNT(*) FROM attempt_events").fetchone()[0]
-            assert leaked == 0, f"真实库被污染 {leaked} 行（已清理）"
-        else:
-            n = 0
+        n = conn.execute("SELECT COUNT(*) FROM attempt_events").fetchone()[0]
     finally:
         conn.close()
-    assert n == BASELINE_N == 0, f"真实库 attempt_events 应为 0 行，实际 {n}（基线 {BASELINE_N}）"
+    assert n == BASELINE_N, f"真实库 attempt_events 行数漂移：{BASELINE_N} → {n}（本轮测试写了真实库）"
+
 
 
 def test_meta_sim_mode(tmp_path, monkeypatch):
@@ -578,3 +587,227 @@ def test_turn_nondemo_pack_family_byparts(client, monkeypatch):
     q = d["question"]
     assert q["statement_md"] and q["answer_sympy"]
     assert q["verify_level"] == "green" and q["routed"] == "family"
+
+
+# --------------------------------------------------------------------------- #
+# P0 修补（2026-09-12）：填空解析预检
+# --------------------------------------------------------------------------- #
+
+def test_parse_check_endpoint(client):
+    """可解析→parseable:true；乱串→parseable:false + 人类可读 error。"""
+    ok = client.post("/v2/parse-check", json={"expr": "(x+1)^2 - (x^2+2x+1)"}).json()
+    assert ok["ok"] is True and ok["parseable"] is True and ok["error"] is None
+    bad = client.post("/v2/parse-check", json={"expr": "((( unparseable"}).json()
+    assert bad["parseable"] is False and "无法识别" in bad["error"]
+    bare = client.post("/v2/parse-check", json={"expr": "sin"}).json()
+    assert bare["parseable"] is False  # 裸函数名：解析成功但无法判分
+
+
+def test_answer_parse_error_skips_event(client):
+    """不可解析作答：correct=False 但不记事件、不出决策（零学习信号不入记忆）。"""
+    t = _turn(client)
+    q = t["question"]
+    before = client.get("/v2/stats").json()
+    d = client.post("/v2/answer", json={
+        "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
+        "student_answer": "((( ???", "standard_answer": q["answer_sympy"],
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "difficulty": "基础",
+    }).json()
+    assert d["ok"] is True and d["correct"] is False
+    assert d.get("parse_error") and "无法识别" in d["parse_error"]
+    assert d["event_recorded"] is False and d["event_id"] is None and d["decision"] is None
+    after = client.get("/v2/stats").json()
+    assert after.get("total", 0) == before.get("total", 0), "事件总数不应增加"
+
+
+# --------------------------------------------------------------------------- #
+# 拍照识别（可选 sidecar）：未启动时优雅降级
+# --------------------------------------------------------------------------- #
+
+def test_photo_recognize_sidecar_down(client, monkeypatch):
+    """sidecar 不存在 → 200 + ok:false + ingest_unavailable（可选组件不阻断练习）。"""
+    import base64
+    png1x1 = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
+    monkeypatch.setenv("MATHFORGE_INGEST_URL", "http://127.0.0.1:1")  # 端口 1 必然连接拒绝
+    r = client.post("/v2/photo-recognize",
+                    files={"file": ("p.png", png1x1, "image/png")})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["ok"] is False
+    assert d["code"] == "ingest_unavailable"
+    assert "识别服务" in d["reason"]
+
+
+def test_extract_answer_latex_heuristics():
+    """答案候选提取启发式：推导链取最后一个等号后的值；掩码/超长放弃。"""
+    from v2.v2api import _extract_answer_latex
+    md = "题干……\n\n$$f'(x) = 3x^2-3$$\n\n$$\left[ \frac{x^4}{4} \right]_{1}^{3} = 12$$"
+    assert _extract_answer_latex(md) == "12"
+    assert _extract_answer_latex("没有数学块") is None
+    assert _extract_answer_latex("$f(x) = ⟨?⟩$") is None  # unclear 掩码（sidecar 实际输出形态）放弃
+
+
+# ---- 今日计划（2026-09-12）----
+
+def test_plan_cold_start_returns_zero_api_family(client):
+    """空库 → 计划全部来自零 API 确定性族 kp，且只显中文名。"""
+    d = client.get("/v2/plan?n=3").json()
+    assert d["ok"] is True and len(d["items"]) == 3
+    for it in d["items"]:
+        assert it["zero_api"] is True
+        assert it["name"] and "_" not in it["name"][:2]  # 中文名，非裸 id
+
+
+def test_plan_weakest_first(client):
+    """有记录后：衰减掌握度最低的 kp 排最前，理由带掌握度。"""
+    t = _turn_fresh(client)  # 跨题去重语义下拿一道没答过的新题
+    q = t["question"]
+    client.post("/v2/answer", json={
+        "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
+        "student_answer": "999999", "standard_answer": q["answer_sympy"],
+        "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "attribution_override": "概念混淆",
+        "difficulty": "基础"})
+    d = client.get("/v2/plan?n=3").json()
+    assert d["items"][0]["kp_id"] == t["kp"]["id"]
+    assert "掌握度" in d["items"][0]["reason"]
+
+
+# ---- 每人一库（2026-09-12，AI-PM B1）：X-MF-Profile 档案隔离 ----
+
+def test_profile_isolation(client):
+    """不同档案库互不可见：stuA 作答只进 stuA 的库，默认库与 stuB 计数不变。"""
+    # 档案库已隔离到 TMP_DIR（MATHFORGE_PROFILES_DIR）；本测试先清自己的档案库保证从零开始
+    from v2.v2api import _profiles_dir
+    for nm in ("mathforge_stuA.db", "mathforge_stuB.db"):
+        f = os.path.join(_profiles_dir(), nm)
+        if os.path.exists(f):
+            os.remove(f)
+    t = _turn(client)
+    q = t["question"]
+    body = {"pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
+            "student_answer": q["answer_sympy"], "standard_answer": q["answer_sympy"],
+            "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "difficulty": "基础"}
+    before = client.get("/v2/stats").json()["event_count"]
+    r = client.post("/v2/answer", json=body, headers={"X-MF-Profile": "stuA"})
+    assert r.status_code == 200 and r.json()["correct"] is True
+    # 默认库计数不变（事件没漏进默认库）
+    assert client.get("/v2/stats").json()["event_count"] == before
+    # stuB 是全新档案：自己的库从 0 开始（彼此隔离，各记各的）
+    assert client.get("/v2/stats", headers={"X-MF-Profile": "stuB"}).json()["event_count"] == 0
+    # stuA 能看到自己的作答（作答行 + 策略落盘行 = 2）
+    assert client.get("/v2/stats", headers={"X-MF-Profile": "stuA"}).json()["event_count"] == 2
+    # 档案库文件真实存在且在 profiles/ 下（清理：测试不留库文件）
+    prof_dir = os.environ["MATHFORGE_PROFILES_DIR"]
+    assert os.path.exists(os.path.join(prof_dir, "mathforge_stuA.db"))
+
+
+def test_profile_name_sanitized(client):
+    """非法档案名（路径注入）一律回落默认库，不产生任意路径文件。"""
+    t = _turn(client)
+    q = t["question"]
+    body = {"pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
+            "student_answer": "0", "standard_answer": q["answer_sympy"],
+            "statement_md": q["statement_md"], "question_fp": q.get("question_fp", ""), "difficulty": "基础"}
+    before = client.get("/v2/stats").json()["event_count"]
+    r = client.post("/v2/answer", json=body,
+                    headers={"X-MF-Profile": "../../evil"})
+    # 非法档案名 → 422 拒绝（复评 S1：回落会破坏隔离语义），默认库不受影响
+    assert r.status_code == 422
+    assert r.json()["code"] == "bad_profile"
+    assert client.get("/v2/stats").json()["event_count"] == before
+
+
+# ---- AI 变式策略与作答通道（任务书 P2，2026-09-15） ----
+#
+# 策略测试 = 纯单元：内存临时库直接构造事件序列调 _pick_variant_strategy，零随机、零 HTTP。
+# （第一版走 client 集成，但 /v2/turn 随机出题+跨测试共享库引入不可复现性——单元化后才稳。）
+
+import sqlite3 as _sq
+
+
+def _unit_db():
+    """临时单元库（文件级 tmp 目录，用完即删）。"""
+    os.makedirs(TMP_DIR, exist_ok=True)
+    path = os.path.join(TMP_DIR, "unit_strategy.db")
+    if os.path.exists(path):
+        os.remove(path)
+    conn = _sq.connect(path)
+    conn.row_factory = _sq.Row
+    import mem2 as _m
+    _m.connect(path).close()          # 幂等建表
+    return conn, path
+
+
+def _ev(conn, kp, mode, result, ts):
+    mem2.append_event(conn, pack="calculus", kp=kp, qtype="fill", mode=mode,
+                      result=result, ts=ts)
+
+
+def test_strategy_wrong_then_none():
+    conn, path = _unit_db()
+    try:
+        _ev(conn, "kp.x", "answer", "wrong", 1000)
+        from v2.v2api import _pick_variant_strategy
+        assert _pick_variant_strategy(conn, "kp.x") == "contextual"
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_strategy_streak2_gives_multistep():
+    conn, path = _unit_db()
+    try:
+        _ev(conn, "kp.x", "answer", "wrong", 1000)
+        _ev(conn, "kp.x", "answer", "correct", 2000)
+        _ev(conn, "kp.x", "answer", "correct", 3000)
+        from v2.v2api import _pick_variant_strategy
+        assert _pick_variant_strategy(conn, "kp.x") == "multistep"
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_strategy_no_events_defaults_contextual():
+    conn, path = _unit_db()
+    try:
+        from v2.v2api import _pick_variant_strategy
+        assert _pick_variant_strategy(conn, "kp.empty") == "contextual"
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_strategy_retry_not_counted():
+    conn, path = _unit_db()
+    try:
+        _ev(conn, "kp.x", "answer", "wrong", 1000)
+        _ev(conn, "kp.x", "retry", "correct", 2000)     # 订正不计 streak
+        from v2.v2api import _pick_variant_strategy
+        assert _pick_variant_strategy(conn, "kp.x") == "contextual"
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_answer_mode_variant_counts_in_heatmap(client):
+    """mode='variant' 作答计入热力图（口径与 answer 一致，任务书 P2-b）。
+
+    集成口径只验「计数通道」：variant 事件落库后 heatmap 当日 count 增长 ≥1。
+    用 tmp 库直写事件，不依赖随机出题。
+    """
+    import datetime as _dt
+    conn = _tmp_conn()
+    try:
+        today = _dt.date.today().strftime("%Y-%m-%d")
+        before = conn.execute(
+            "SELECT COUNT(*) FROM attempt_events WHERE day=? AND mode='variant'",
+            (today,)).fetchone()[0]
+        mem2.append_event(conn, pack="calculus", kp="calc.rolle", qtype="fill",
+                          mode="variant", result="correct", meta={"parse_ok": True})
+    finally:
+        conn.close()
+    hm = client.get("/v2/heatmap?days=7").json()
+    today = _dt.date.today().strftime("%Y-%m-%d")
+    row = [x for x in hm if x["day"] == today]
+    assert row and row[0]["count"] >= before + 1

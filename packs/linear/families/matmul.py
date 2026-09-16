@@ -43,6 +43,7 @@ def _reshape(item: dict) -> dict:
     item = dict(item)
     item.setdefault("kp_id", KP_ID)
     item.setdefault("verify_level", "green")
+    item.setdefault("analysis", "矩阵乘法：结果矩阵第 i 行第 j 列的元素 = 左矩阵第 i 行与右矩阵第 j 列对应元素乘积之和；本题由 SymPy 按此定义直接计算并校验（构造即正确）。")
     return item
 
 
