@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f4efe4">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23b0562b'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-weight='bold' fill='%23fdf8ee' text-anchor='middle'%3E%E2%88%91%3C/text%3E%3C/svg%3E">
 <title>MathForge v2 · 今日</title>
 <link rel="stylesheet" href="/ui/vendor/katex/katex.min.css">
-<link rel="stylesheet" href="/ui2/style.css?v=20260923b">
+<link rel="stylesheet" href="/ui2/style.css?v=20260924a">
 </head>
 <body>
+<div class="ambient" aria-hidden="true"><b></b><b></b><b></b></div>
+<div class="scroll-progress" aria-hidden="true"><i></i></div>
 <header class="topbar">
   <div class="brand">MathForge <span class="ver">v2</span></div>
   <span class="sim-badge" id="simBadge" hidden>模拟数据</span>
@@ -38,6 +41,9 @@
       <button id="intent-go" class="primary">出题</button>
       <div id="intent-hint" class="hint" hidden></div>
     </div>
+
+    <!-- 今日概览（只读聚合：今日已练 / 连续打卡 / 在练考点 / 累计题量；由 motion.js 填充） -->
+    <div id="overview" class="overview" hidden></div>
 
     <!-- 今日计划（已练最弱优先，冷启动给零 API 族保底；冷启动态隐藏让位推荐卡） -->
     <div id="plan-wrap" class="plan-wrap" hidden></div>
@@ -103,6 +109,7 @@
       <div class="facts-col">
         <h2>足迹</h2>
         <div id="heatmap-wrap"></div>
+        <div class="hm-legend" id="hmLegend" hidden></div>
         <div class="detail-box">
           <h3>当日明细</h3>
           <div id="daily-list" class="mini"></div>
@@ -129,6 +136,6 @@
 <meta http-equiv="Cache-Control" content="no-cache" />
 <script src="/ui2/app.js?v=20260923a"></script>
 <script src="/ui2/gsap.min.js"></script>
-<script src="/ui2/motion.js"></script>
+<script src="/ui2/motion.js?v=20260924a"></script>
 </body>
 </html>
