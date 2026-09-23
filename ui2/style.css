@@ -267,30 +267,16 @@ h3 { font-size: 14px; margin: 10px 0 6px; color: var(--sub); }
 .skel .ln.bar { height: 6px; width: 60%; }
 @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 
-/* ---------- 出题卡（单列堆叠：溯源 → 题干 → 作答面板 → 结果 → 页脚） ---------- */
-.practice { background: var(--card); border: 1px solid var(--acc-line); border-radius: var(--r-lg);
-  padding: 16px 22px 16px; margin: 16px auto 0; max-width: 880px;
-  box-shadow: 0 2px 5px rgba(var(--shadow-warm), .06), 0 18px 44px rgba(var(--shadow-warm), .13);
+/* ---------- 出题卡（样式对齐线上部署版 9e30d10，仅保留异常态 Guard） ---------- */
+.practice { background: var(--card); border: 1px solid var(--acc-line); border-radius: var(--r-card);
+  padding: 16px 20px; margin: 14px auto 0; max-width: 900px;
+  box-shadow: 0 2px 5px rgba(var(--shadow-warm), .06), 0 16px 40px rgba(var(--shadow-warm), .12);
   animation: practice-in .42s var(--ease); }
 @keyframes practice-in { from { opacity: 0; transform: translateY(14px) scale(.985); }
   to { opacity: 1; transform: none; } }
-.statement { font-size: 16.5px; margin: 6px 0 14px; overflow-x: auto; padding: 2px 0;
-  line-height: 1.75; }
+.statement { font-size: 16px; margin: 8px 0 12px; overflow-x: auto; padding: 2px 0; }
 
-/* 作答区面板：全宽内嵌小卡，「输入 → 提交 → 预览 → 拍照」收进同一个容器 */
-.practice > #fill-area, .practice > #sol-area {
-  background: var(--inset); border: 1px solid var(--line);
-  border-radius: 12px; padding: 12px 16px 14px; }
-.practice > #fill-area::before, .practice > #sol-area::before {
-  content: "作答区"; display: block; font-size: 11px; font-weight: 700;
-  color: var(--acc); font-family: var(--mono); letter-spacing: .08em;
-  margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px dashed var(--line-hi); }
-.practice > #fill-area .preview { background: #fdfbf4; border-color: var(--line-hi);
-  min-height: 34px; padding: 6px 10px; font-size: 14px; }
-.practice > #sol-area details { background: #fdfbf4; }
-
-/* 异常态 Guard：题干还没到 / 题干为空时，作答面板一律退场，
-   卡片只呈现「出题中」或「溯源 + 元信息」，不留无意义的空腔 */
+/* 异常态 Guard：题干还没到 / 题干为空时，作答区退场（正常作答态样式与线上版一致） */
 .practice:has(#q-statement .skel) #fill-area,
 .practice:has(#q-statement .skel) #sol-area,
 .practice:has(> .statement:empty) #fill-area,
@@ -302,10 +288,8 @@ h3 { font-size: 14px; margin: 10px 0 6px; color: var(--sub); }
 .statement .skel .ln.w40 { width: 46%; } .statement .skel .ln.w70 { width: 72%; }
 /* 溯源区被清空时不要渲染成一条裸灰条 */
 .provenance:empty { display: none; }
-/* 出题卡底部操作区：一道细线收底，「收起来 / 再练一题」读作页脚而非孤儿按钮 */
-.practice > .row-end { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 11px; }
 .provenance { font-size: 13px; color: var(--ink); background: var(--inset);
-  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; }
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; margin-bottom: 9px; }
 .prov-row { margin: 3px 0; }
 .prov-label { color: var(--acc); font-weight: 700; margin-right: 6px; }
 .prov-math { display: block; overflow-x: auto; font-size: 14px; margin: 4px 0 2px; }
@@ -313,42 +297,41 @@ h3 { font-size: 14px; margin: 10px 0 6px; color: var(--sub); }
 .prov-change { font-size: 12px; background: var(--acc-soft); border: 1px solid var(--acc-line);
   border-radius: var(--r-pill); padding: 1px 10px; color: var(--acc); }
 .prov-ok { color: var(--good); font-weight: 700; }
-.qmeta { font-size: 13px; color: var(--sub); margin-bottom: 4px;
+.qmeta { font-size: 13px; color: var(--sub); margin-bottom: 6px;
   font-variant-numeric: tabular-nums; }
 .row { display: flex; gap: 8px; }
 .row button { white-space: nowrap; flex: none; }   /* 提交按钮永不折行 */
-.preview { min-height: 40px; padding: 8px 10px; color: var(--sub); font-size: 15px;
-  background: var(--inset); border: 1px dashed var(--line); border-radius: 10px; margin-top: 8px; }
+.preview { min-height: 36px; padding: 6px 4px; color: var(--sub); font-size: 15px; }
 .preview .katex { color: var(--ink); }
-.grade-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.grade-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .grade-row .lbl { font-size: 13px; color: var(--sub); }
-.grade-btn { min-width: 76px; padding: 8px 0; }
+.grade-btn { min-width: 72px; padding: 8px 0; }
 .row-end { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
-#result-area { margin-top: 12px; animation: page-in .3s var(--ease); }
-.verdict { font-size: 16px; animation: pop-in .4s var(--ease); }
+#result-area { margin-top: 10px; animation: page-in .3s var(--ease); }
+.verdict { font-size: 15px; animation: pop-in .4s var(--ease); }
 @keyframes pop-in { 0% { transform: scale(.9); opacity: 0; } 60% { transform: scale(1.04); }
   100% { transform: scale(1); opacity: 1; } }
 .verdict.ok { color: var(--good); font-weight: 700; }
 .verdict.bad { color: var(--err); font-weight: 700; }
 .verdict.warn { color: var(--warn); font-weight: 700; }
-.why { margin-top: 8px; font-size: 13px; color: var(--sub); background: var(--inset);
-  border-left: 3px solid var(--acc); padding: 8px 12px; border-radius: 0 10px 10px 0; }
+.why { margin-top: 6px; font-size: 13px; color: var(--sub); background: var(--inset);
+  border-left: 3px solid var(--acc); padding: 6px 10px; border-radius: 0 8px 8px 0; }
 .attr-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.attr-chip { border-radius: var(--r-pill); padding: 4px 14px; font-size: 13px;
+.attr-chip { border-radius: var(--r-pill); padding: 3px 13px; font-size: 13px;
   border: 1px solid var(--line-hi); background: var(--card-hi); }
 .attr-chip:hover { border-color: var(--acc-line); color: var(--acc); }
 .attr-chip.sel { background: var(--acc); color: var(--acc-ink); border-color: var(--acc);
   font-weight: 600; }
 .empty { background: var(--card); border: 1px dashed var(--line-hi); border-radius: var(--r-card);
-  padding: 24px 16px; text-align: center; color: var(--sub); animation: page-in .3s var(--ease); }
+  padding: 22px 14px; text-align: center; color: var(--sub); animation: page-in .3s var(--ease); }
 .reco { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
 .reco button { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc);
   font-weight: 600; }
 .reco button:hover { background: rgba(176, 86, 43, .18); box-shadow: 0 4px 12px rgba(176, 86, 43, .16); }
-details { border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px;
+details { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
   margin-top: 8px; font-size: 14px; background: var(--card); }
 details summary { cursor: pointer; color: var(--sub); }
-details[open] summary { color: var(--acc); font-weight: 600; }
+details[open] summary { color: var(--acc); }
 
 /* ---------- 页 B · 足迹统计（宽屏双栏） ---------- */
 .facts-cols { display: block; }
