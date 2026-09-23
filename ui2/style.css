@@ -269,13 +269,42 @@ h3 { font-size: 14px; margin: 10px 0 6px; color: var(--sub); }
   .practice > .provenance { grid-area: prov; }
   .practice > .qmeta      { grid-area: meta; }
   .practice > .statement  { grid-area: stmt; margin-bottom: 4px; }
-  .practice > #fill-area  { grid-area: side; }
-  .practice > #sol-area   { grid-area: side; }
   .practice > #result-area{ grid-area: res; }
   .practice > .row-end    { grid-area: end; }
+
+  /* 作答区面板化：右侧控件收进一张内嵌小卡，与题干有明确归属关系，
+     不再是悬浮在栏里的一组散件 */
+  .practice > #fill-area, .practice > #sol-area {
+    grid-area: side; align-self: start;
+    background: var(--inset); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px 14px; }
+  /* 题干偏长时作答面板跟随视口，提交键始终可见 */
+  .practice > #fill-area { position: sticky; top: 76px; }
+  .practice > #fill-area::before, .practice > #sol-area::before {
+    content: "作答区"; display: block; font-size: 11px; font-weight: 700;
+    color: var(--acc); font-family: var(--mono); letter-spacing: .08em;
+    margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px dashed var(--line-hi); }
   .practice > #fill-area .row { flex-direction: column; align-items: stretch; }
   .practice > #fill-area .row .primary { width: 100%; }
+  /* 面板内预览改纸面白，避免「inset 套 inset」糊成一片 */
+  .practice > #fill-area .preview { background: #fdfbf4; border-color: var(--line-hi);
+    min-height: 34px; padding: 6px 10px; font-size: 14px; }
+
+  /* 出题中：退回单列居中加载态——骨架占满整行、右栏作答面板退场，
+     杜绝「左骨架 + 右空作答」的错位观感 */
+  .practice:has(#q-statement .skel) { grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "prov" "meta" "stmt" "res" "end"; }
+  .practice:has(#q-statement .skel) #fill-area,
+  .practice:has(#q-statement .skel) #sol-area { display: none; }
 }
+/* 出题中的骨架：拉高、居中呼吸，把卡片撑成有分量的加载态 */
+.statement .skel { background: transparent; border: 0; padding: 18px 6px; }
+.statement .skel .ln { height: 14px; }
+.statement .skel .ln.w40 { width: 46%; } .statement .skel .ln.w70 { width: 72%; }
+/* 溯源区被清空时不要渲染成一条裸灰条 */
+.provenance:empty { display: none; }
+/* 出题卡底部操作区：一道细线收底，「收起来 / 再练一题」读作页脚而非孤儿按钮 */
+.practice > .row-end { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 11px; }
 .provenance { font-size: 13px; color: var(--ink); background: var(--inset);
   border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; }
 .prov-row { margin: 3px 0; }
