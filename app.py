@@ -441,6 +441,22 @@ from v2api import router as v2_router  # noqa: E402 —— v2 填空闭环接线
 app.include_router(v2_router, prefix="/v2")
 
 # ui2/ 静态服务（T6 v2 四视图界面 + 填空表达式输入面板；独立目录，零改动 v1 端点）
+# 前端改版后必须让浏览器拿到新资源：静态响应统一 no-cache，避免启发式缓存长期吃旧版
+class _NoCacheStatic(StaticFiles):
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        if resp.status_code == 200:
+            resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return resp
+
+
 _UI2_DIR = Path(__file__).resolve().parent / "ui2"
 if _UI2_DIR.exists():
-    app.mount("/ui2", StaticFiles(directory=str(_UI2_DIR), html=True), name="ui2")
+    app.mount("/ui2", _NoCacheStatic(directory=str(_UI2_DIR), html=True), name="ui2")
+
+
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+def _root():
+    """根路径直达学生端 ui2（此前 / 无路由 → 分享链接打开即 404）。"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/ui2/")
