@@ -221,13 +221,17 @@
   function practiceSeq() {
     const p = $('#practice');
     if (!p) return;
-    const kids = [];
     const prov = p.querySelector('.provenance');
     const meta = p.querySelector('.qmeta');
     const stmt = p.querySelector('.statement');
     const act = p.querySelector('#fill-area:not([hidden])') || p.querySelector('#sol-area:not([hidden])');
+    const parts = [p, prov, meta, stmt, act].filter(Boolean);
+    // 防残留：快速连开出题卡时，旧 tween 的内联样式可能把元素留在半隐状态
+    G.killTweensOf(parts);
+    G.set(parts, { clearProps: 'all' });
+    const kids = [];
     [prov, meta].forEach(x => x && kids.push(x));
-    const tl = G.timeline({ defaults: { ease: EASE } });
+    const tl = G.timeline({ defaults: { ease: EASE, overwrite: 'auto' } });
     tl.from(p, { y: 24, autoAlpha: 0, scale: .99, duration: .5 })
       .from(kids, { y: 10, autoAlpha: 0, duration: .4, stagger: .07 }, '-=.3')
       .from(stmt, { y: 14, autoAlpha: 0, duration: .45 }, '-=.26');
@@ -317,6 +321,17 @@
     if (p && !p.hidden && ready && !seen.has(p)) {
       seen.add(p);
       practiceSeq();
+    }
+    // 保险丝：出题卡可见时，任何子元素不该停留在半透明/位移的残留态
+    // （快速连开、tween 被打断等边界；正在动画中的元素跳过）
+    if (FX && p && !p.hidden) {
+      Array.prototype.forEach.call(p.children, el => {
+        if (el.hidden || G.isTweening(el)) return;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || +cs.opacity < .95 || cs.transform !== 'none') {
+          G.set(el, { clearProps: 'all' });
+        }
+      });
     }
     // 收起后允许下次重新入场
     if (p && p.hidden && seen.has(p)) seen.delete(p);
