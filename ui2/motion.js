@@ -278,6 +278,14 @@
       }
     }
 
+    // 近况序列色块：错峰弹入（读序从左到右）
+    const dots = $$('#review-list .trend i').filter(el => !seen.has(el));
+    if (dots.length) {
+      dots.forEach(el => seen.add(el));
+      G.from(dots, { scale: .2, autoAlpha: 0, duration: .32, ease: 'back.out(2)',
+        stagger: { each: .025, from: 'start' }, clearProps: 'all' });
+    }
+
     // 分组标题
     const titles = $$('#review-list .group-title').filter(el => !seen.has(el));
     if (titles.length) {

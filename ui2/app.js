@@ -206,6 +206,24 @@ function renderReview() {
   });
 }
 
+/* 近况序列：trend_str 是「对/错/半/·」的字符序列，左=最早、右=最近（后端口径）
+   → 渲染成一颗一题的色块序列，最新一次带强调环，右侧给一个 x/y 命中比 */
+function trendHTML(str) {
+  const chs = Array.from(String(str || ''));
+  if (!chs.length) return '';
+  const MAP = { '对': ['ok', '答对'], '错': ['bad', '答错'], '半': ['mid', '半对'], '·': ['na', '未记录'] };
+  let hit = 0;
+  const dots = chs.map((ch, i) => {
+    const d = MAP[ch] || MAP['·'];
+    if (ch === '对') hit++;
+    const last = i === chs.length - 1 ? ' last' : '';
+    return `<i class="t-${d[0]}${last}" title="${d[1]}"></i>`;
+  }).join('');
+  return `<span class="trend-lbl">近况</span>`
+    + `<span class="trend" title="最近 ${chs.length} 题：左早 → 右近（末位为最近一次）">${dots}</span>`
+    + `<span class="trend-hit">${hit}/${chs.length}</span>`;
+}
+
 function cardHTML(it) {
   const name = esc(it.name || it.kp);          // 禁裸 id：永远用 name 渲染
   const rawAttr = esc(attrText(it.last_attribution));
@@ -213,6 +231,7 @@ function cardHTML(it) {
   const recStmt = (it.recent || []).find(r => r.stmt) || {};
   const m = Math.round(((it.decayed_value ?? 0)) * 100);
   const res = it.trend_str || '';
+  const streak = it.streak_correct ? ` · 连对 ${it.streak_correct}` : '';
   return `<div class="card" data-kp="${esc(it.kp)}" data-name="${name}">
     <div class="c-top">
       <span class="kp-name">${name}</span>
@@ -222,8 +241,11 @@ function cardHTML(it) {
     ${recStmt.stmt
       ? `<span class="stmt-lbl">最近：</span><div class="stmt stmt-r" data-stmt="${esc(recStmt.stmt)}"></div>`
       : ''}
-    <div class="mastery-bar"><i data-w="${Math.min(100, Math.max(0, m))}%" style="width:0"></i></div>
-    <div class="meta" title="最近 5 题，从最近往前">掌握 ${m}%${res ? ` · 近况 ${esc(res)}` : ''}${it.streak_correct ? ` · 连对 ${it.streak_correct}` : ''}</div>
+    <div class="mastery-row">
+      <span class="mastery-bar"><i data-w="${Math.min(100, Math.max(0, m))}%" style="width:0"></i></span>
+      <span class="mpct">${m}%</span>
+    </div>
+    <div class="meta" title="掌握度随时间衰减，最近一次作答后更新">${trendHTML(res)}${streak}</div>
     <div class="row-end" style="margin-top:8px">
       <button class="primary practice-btn">练一题</button>
     </div>
