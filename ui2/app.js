@@ -689,7 +689,7 @@ async function loadPatterns() {
   }
   el.innerHTML = items.map(it =>
     `<div class="li"><b>${esc(it.name)}</b>：${esc(it.pattern)}
-      <div style="color:#3c3489">${esc(it.advice)} <span class="tag">规则蒸馏</span></div></div>`).join('');
+      <div class="advice">${esc(it.advice)} <span class="tag">规则蒸馏</span></div></div>`).join('');
 }
 async function loadMastery() {
   const d = await api('/v2/review?limit=500&detail=1').catch(() => ({ items: [] }));

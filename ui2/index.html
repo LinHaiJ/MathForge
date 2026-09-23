@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0f1216">
+<meta name="theme-color" content="#f4efe4">
 <title>MathForge v2 · 今日</title>
 <link rel="stylesheet" href="/ui/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="/ui2/style.css">
@@ -97,23 +97,29 @@
     </div>
   </section>
 
-  <!-- ============ 页 B 足迹统计（单页滚动，只读） ============ -->
+  <!-- ============ 页 B 足迹统计（单页滚动，只读；宽屏双栏） ============ -->
   <section id="view-facts" class="page">
-    <h2>足迹</h2>
-    <div id="heatmap-wrap"></div>
-    <div class="detail-box">
-      <h3>当日明细</h3>
-      <div id="daily-list" class="mini"></div>
+    <div class="facts-cols">
+      <div class="facts-col">
+        <h2>足迹</h2>
+        <div id="heatmap-wrap"></div>
+        <div class="detail-box">
+          <h3>当日明细</h3>
+          <div id="daily-list" class="mini"></div>
+        </div>
+      </div>
+      <div class="facts-col">
+        <h2>掌握度分布</h2>
+        <div id="mastery-dist" class="bars"></div>
+        <h2>错因分布</h2>
+        <div id="attr-dist" class="bars"></div>
+        <h2>薄弱模式</h2>
+        <div id="patterns" class="mini"></div>
+        <details id="timeline-box"><summary>策略时间线（只读）</summary>
+          <div id="timeline" class="mini"></div>
+        </details>
+      </div>
     </div>
-    <h2>掌握度分布</h2>
-    <div id="mastery-dist" class="bars"></div>
-    <h2>错因分布</h2>
-    <div id="attr-dist" class="bars"></div>
-    <h2>薄弱模式</h2>
-    <div id="patterns" class="mini"></div>
-    <details id="timeline-box"><summary>策略时间线（只读）</summary>
-      <div id="timeline" class="mini"></div>
-    </details>
   </section>
 </main>
 
@@ -121,6 +127,8 @@
 
 <script src="/ui/vendor/katex/katex.min.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache" />
-<script src="/ui2/app.js?v=20260916c"></script>
+<script src="/ui2/app.js?v=20260923a"></script>
+<script src="/ui2/gsap.min.js"></script>
+<script src="/ui2/motion.js"></script>
 </body>
 </html>
