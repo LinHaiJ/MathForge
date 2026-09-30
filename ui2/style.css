@@ -165,6 +165,19 @@ h3 { font-size: 14px; margin: 10px 0 6px; color: var(--sub); }
 .hint .chip:hover { background: rgba(176, 86, 43, .18); }
 .hint .chip:active { transform: scale(.95); }
 
+/* ---------- 意图歧义确认卡（模块 E「问而不猜」：模糊时让学生点选考点） ---------- */
+/* 按需由 app.js 创建在意图条正下方，关闭即移除；无歧义时不存在该节点 */
+.intent-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 6px 2px 2px; padding: 10px 14px; background: var(--card);
+  border: 1px solid var(--acc-line); border-radius: var(--r-card);
+  box-shadow: var(--sh-1); animation: page-in .3s var(--ease); }
+.intent-confirm .ic-lbl { font-size: 13px; font-weight: 700; color: var(--acc); }
+.intent-confirm .ic-opt { background: var(--acc-soft); border-color: var(--acc-line);
+  color: var(--acc); font-weight: 600; }
+.intent-confirm .ic-opt:hover { background: rgba(176, 86, 43, .18); }
+.intent-confirm .ic-cancel { background: transparent; color: var(--sub); }
+.intent-confirm .ic-cancel:hover { color: var(--ink); box-shadow: none; }
+
 /* ---------- 今日概览（4 格数据条） ---------- */
 .overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px; margin: 12px 0 2px; }

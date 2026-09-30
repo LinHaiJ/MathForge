@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-# 目录重组（2026-09-12）：mem2 → v2/，db → v1/；conftest 已注册路径，改用 flat import
+# 目录重组（2026-09-12）：mem2 → v2/；v1 退役（2026-09-30）后 db.py 也迁入 v2/；conftest 已注册路径，改用 flat import
 import mem2
 from db import DB_PATH as V1_DB_PATH, decayed as v1_decayed
 

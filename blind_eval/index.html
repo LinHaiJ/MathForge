@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathForge 盲评 · 2AFC + Rubric</title>
+<style>
+/* ============================================================
+   MathForge 盲评工具页（模块 K）——独立极简「纸墨」风。
+   本页为本地静态工具（不入 /ui2 学生端）：纯 HTML/JS/CSS 单文件，
+   无框架、无构建、无 CDN；仅依赖同目录 blind.json / key.json。
+   题干按 LaTeX 源码原样展示（离线无渲染库，评测者可读）。
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: #f5f1e6;  --card: #fbf8f0;  --inset: #f0ead9;
+  --ink: #33291c; --sub: #847960;   --line: #e2d8c2; --line-hi: #cdc0a4;
+  --acc: #b0562b; --acc-ink: #fdf8ee; --acc-soft: rgba(176,86,43,.10);
+  --good: #4a7c59; --good-soft: rgba(74,124,89,.12);
+  --err: #a83a32;  --err-soft: rgba(168,58,50,.10);
+  --warn: #96742a; --warn-soft: rgba(150,116,42,.12);
+  --mono: Consolas, "JetBrains Mono", monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.75 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 18px 16px 80px; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+         border-bottom: 2px solid var(--line-hi); padding-bottom: 10px; margin-bottom: 14px; }
+header h1 { font-size: 19px; margin: 0; }
+header .sub { color: var(--sub); font-size: 13px; }
+.progress { flex: 1; min-width: 160px; height: 8px; background: var(--inset);
+            border-radius: 99px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--acc); width: 0; transition: width .25s; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+        padding: 14px 16px; margin: 12px 0; box-shadow: 0 1px 2px rgba(72,56,28,.05); }
+.kpchip { display: inline-block; background: var(--acc-soft); color: var(--acc);
+          border: 1px solid rgba(176,86,43,.38); border-radius: 99px;
+          padding: 1px 12px; font-size: 13px; }
+.muted { color: var(--sub); font-size: 13px; }
+.stmt { white-space: pre-wrap; font-family: var(--mono); font-size: 14.5px; margin: 8px 0; }
+details.master > summary { cursor: pointer; color: var(--sub); font-size: 13px; }
+.two { display: flex; gap: 14px; flex-wrap: wrap; }
+.two > .card { flex: 1 1 380px; margin: 0; }
+.side-badge { display: inline-block; font-weight: 700; border-radius: 6px;
+              padding: 0 10px; background: var(--ink); color: var(--card); font-size: 14px; }
+.dim-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; flex-wrap: wrap; }
+.dim-row .name { flex: 0 0 120px; font-size: 13.5px; }
+.score-btns { display: flex; gap: 4px; }
+.score-btns button, .choice-btns button, .nav button, .export button {
+  font: inherit; font-size: 13.5px; padding: 3px 12px; border-radius: 8px;
+  border: 1px solid var(--line-hi); background: var(--card); color: var(--ink); cursor: pointer;
+}
+.score-btns button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+.choice-btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.choice-btns button { padding: 6px 18px; font-size: 14.5px; }
+.choice-btns button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.locked { opacity: .75; pointer-events: none; }
+.nav { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.nav .spacer { flex: 1; }
+.reveal { border-left: 4px solid var(--warn); background: var(--warn-soft); }
+.reveal .banner { font-size: 13px; color: var(--warn); margin-bottom: 6px; }
+.reveal .item { background: var(--card); border: 1px solid var(--line);
+                border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.pv { display: inline-block; font-size: 12px; border-radius: 99px; padding: 0 10px; margin-right: 6px; }
+.pv.AI { background: var(--err-soft); color: var(--err); border: 1px solid rgba(168,58,50,.4); }
+.pv.family { background: var(--good-soft); color: var(--good); border: 1px solid rgba(74,124,89,.4); }
+.pv.ori { background: var(--inset); color: var(--sub); border: 1px solid var(--line-hi); }
+.verdict { font-size: 14px; margin: 6px 0; }
+.verdict.ok { color: var(--good); } .verdict.bad { color: var(--err); } .verdict.unsure { color: var(--warn); }
+textarea { width: 100%; min-height: 56px; font: inherit; font-size: 14px; color: var(--ink);
+           background: var(--card); border: 1px solid var(--line-hi); border-radius: 8px; padding: 8px; }
+.stat-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+        padding: 10px 16px; min-width: 140px; }
+.stat b { font-size: 22px; display: block; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--card); }
+th, td { border: 1px solid var(--line); padding: 5px 10px; text-align: center; }
+th { background: var(--inset); font-weight: 600; }
+.export button { margin-right: 10px; }
+.hidden { display: none; }
+.errbox { background: var(--err-soft); border: 1px solid rgba(168,58,50,.4); color: var(--err);
+          border-radius: 12px; padding: 14px 16px; }
+.note { font-size: 13px; color: var(--sub); }
+code { font-family: var(--mono); background: var(--inset); padding: 0 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>MathForge 盲评</h1>
+    <span class="sub" id="session-label"></span>
+    <div class="progress"><i id="progress-bar"></i></div>
+    <span class="sub" id="progress-text">0 / 0</span>
+    <button id="btn-restart" title="清空本 session 的本地进度">重来</button>
+  </header>
+
+  <div id="fatal" class="errbox hidden"></div>
+
+  <!-- 逐对盲评视图 -->
+  <div id="view-pair">
+    <div class="card">
+      <span class="kpchip" id="pair-kp"></span>
+      <span class="muted" id="pair-id"></span>
+      <div class="muted" style="margin-top:6px">
+        任务一：左右两道变式（同一考点）。请指认<b>哪一道是 AI 生成</b>；无法判断请选「分不出」。
+        （个别考点没有确定性对照，两道都可能是 AI 生成——按直觉尽力区分即可，结果页会分桶统计。）
+      </div>
+      <div class="choice-btns" id="task1">
+        <button data-choice="left">左边是 AI</button>
+        <button data-choice="right">右边是 AI</button>
+        <button data-choice="unsure">分不出</button>
+      </div>
+    </div>
+
+    <details class="card master" open>
+      <summary>母本 · 真题原题（参考对照，不计分、不参与指认）</summary>
+      <div class="stmt" id="ori-stmt"></div>
+    </details>
+
+    <div class="two">
+      <div class="card" id="card-left"></div>
+      <div class="card" id="card-right"></div>
+    </div>
+
+    <div class="nav">
+      <button id="btn-prev">上一对</button>
+      <button id="btn-submit">提交本对（锁定打分并揭盲对照）</button>
+      <button id="btn-next" disabled>下一对</button>
+      <span class="spacer"></span>
+      <button id="btn-results" class="hidden">查看结果</button>
+    </div>
+
+    <!-- 揭盲对照：提交后可见 -->
+    <div id="reveal" class="card reveal hidden">
+      <div class="banner">对照用 —— 本对打分已在展开前完成并锁定；破绽/露馅点请写进备注（进入破绽清单）。</div>
+      <div id="reveal-items"></div>
+      <div class="verdict" id="reveal-verdict"></div>
+      <div style="margin-top:6px">
+        <div class="note">破绽备注（哪里像 AI / 露馅点 / 其他观察，可留空）：</div>
+        <textarea id="pair-note" placeholder="例：AI 题题干过长、包装痕迹重；换数题数值凑得生硬……"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结果视图 -->
+  <div id="view-results" class="hidden">
+    <div class="card">
+      <h2 style="margin:4px 0 10px">盲评结果</h2>
+      <div class="stat-grid" id="stat-cards"></div>
+      <p class="note" id="stat-read"></p>
+    </div>
+    <div class="card">
+      <h3 style="margin:4px 0 8px">五维均分对比（1-5 盲打）</h3>
+      <table id="rubric-table"></table>
+      <p class="note">按「被指认为 AI / 被指认为原题 / 分不出」三组聚合；均分差异是风格信号的辅助读数，主指标是上方区分率。</p>
+    </div>
+    <div class="card export">
+      <h3 style="margin:4px 0 8px">导出</h3>
+      <button id="btn-export-json">下载结果 JSON</button>
+      <button id="btn-export-md">下载破绽清单 MD</button>
+      <button id="btn-back">返回补评</button>
+      <pre id="flaw-preview" class="stmt" style="max-height:280px;overflow:auto;background:var(--inset);padding:10px;border-radius:8px"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   盲评页逻辑（极简直白定案）：
+   - blind.json = 唯一前端数据（无答案/来源/左右归属）；key.json 只在
+     整对提交后按需 fetch 一次用于揭盲——盲态由文件拆分 + 交互闸门共同保证。
+   - 进度存 localStorage（键含 session 名），可中断续评。
+   - 左右位置构建期已随机定死，本页不做任何重排。
+   ============================================================ */
+var Z95 = 1.959963984540054;
+var state = { blind: null, key: null, keyLoaded: false, idx: 0,
+              answers: {}, session: "" };
+
+function $(s) { return document.querySelector(s); }
+function esc(s) { return String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function storageKey() { return "mfbf_" + state.session; }
+
+function save() {
+  localStorage.setItem(storageKey(), JSON.stringify(
+    { v: 1, idx: state.idx, answers: state.answers }));
+}
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem(storageKey()) || "null"); }
+  catch (e) { return null; }
+}
+
+function wilson(x, n) {
+  if (!n) return null;
+  var p = x / n, d = 1 + Z95 * Z95 / n;
+  var c = (p + Z95 * Z95 / (2 * n)) / d;
+  var h = (Z95 / d) * Math.sqrt(p * (1 - p) / n + Z95 * Z95 / (4 * n * n));
+  /* 端点钳制与 Python 侧一致：x=0 下界恒 0、x=n 上界恒 1（浮点差不容忍） */
+  var lo = x <= 0 ? 0 : Math.max(0, c - h);
+  var hi = x >= n ? 1 : Math.min(1, c + h);
+  return [lo, hi];
+}
+
+function pairCommitted(pid) {
+  var a = state.answers[pid];
+  return !!(a && a.committed);
+}
+
+/* ---------- 渲染：逐对 ---------- */
+function renderPair() {
+  var p = state.blind.pairs[state.idx];
+  var committed = pairCommitted(p.pair_id);
+  var a = state.answers[p.pair_id] || {};
+  $("#pair-kp").textContent = p.kp;
+  $("#pair-id").textContent = p.pair_id + " · 第 " + (state.idx + 1) + " / " + state.blind.pairs.length + " 对";
+  $("#ori-stmt").textContent = (p.ori.statement_md || "") +
+    (p.ori.options ? "\n选项：" + p.ori.options.join("　") : "");
+
+  ["left", "right"].forEach(function (side) {
+    var el = side === "left" ? $("#card-left") : $("#card-right");
+    var it = p[side];
+    var dims = state.blind.rubric_dims || [];
+    var html = '<span class="side-badge">' + (side === "left" ? "左" : "右") + '</span>' +
+      '<span class="muted">' + esc(it.item_id) + '</span>' +
+      '<div class="stmt">' + esc(it.statement_md) + '</div>';
+    if (it.options && it.options.length)
+      html += '<div class="stmt">' + esc(it.options.join("　")) + '</div>';
+    html += '<div class="muted" style="margin-top:6px">任务二 · 五维盲打（1 低 – 5 高）</div>';
+    dims.forEach(function (dim) {
+      html += '<div class="dim-row" data-side="' + side + '" data-dim="' + esc(dim) + '">' +
+        '<span class="name">' + esc(dim) + '</span><span class="score-btns">' +
+        [1, 2, 3, 4, 5].map(function (v) {
+          var on = a.rubric && a.rubric[it.item_id] && a.rubric[it.item_id][dim] === v ? " on" : "";
+          return '<button data-v="' + v + '" class="' + on.trim() + '">' + v + '</button>';
+        }).join("") + '</span></div>';
+    });
+    el.innerHTML = html;
+    el.classList.toggle("locked", committed);
+    el.querySelectorAll(".score-btns button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (pairCommitted(p.pair_id)) return;
+        var row = b.closest(".dim-row");
+        setScore(p.pair_id, it.item_id, row.dataset.dim, parseInt(b.dataset.v, 10));
+        row.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        refreshNav(p.pair_id);   // M-1：打分变化即时刷新提交按钮可用性
+      });
+    });
+  });
+
+  document.querySelectorAll("#task1 button").forEach(function (b) {
+    b.classList.toggle("on", a.choice === b.dataset.choice);
+    b.disabled = committed;
+    b.onclick = function () {
+      if (pairCommitted(p.pair_id)) return;
+      getAnswer(p.pair_id).choice = b.dataset.choice;
+      save();
+      document.querySelectorAll("#task1 button").forEach(function (x) {
+        x.classList.toggle("on", x.dataset.choice === b.dataset.choice);
+      });
+      refreshNav(p.pair_id);
+    };
+  });
+
+  $("#btn-submit").disabled = committed || !pairComplete(p.pair_id);
+  $("#btn-submit").textContent = committed ? "本对已提交（打分已锁定）" : "提交本对（锁定打分并揭盲对照）";
+  $("#btn-prev").disabled = state.idx === 0;
+  $("#btn-next").disabled = !committed || state.idx >= state.blind.pairs.length - 1;
+  $("#btn-results").classList.toggle("hidden",
+    !(committed && state.idx === state.blind.pairs.length - 1));
+
+  var rv = $("#reveal");
+  if (committed) { rv.classList.remove("hidden"); renderReveal(p, a); }
+  else rv.classList.add("hidden");
+
+  var done = state.blind.pairs.filter(function (x) { return pairCommitted(x.pair_id); }).length;
+  $("#progress-bar").style.width = (100 * done / state.blind.pairs.length) + "%";
+  $("#progress-text").textContent = done + " / " + state.blind.pairs.length;
+}
+
+function getAnswer(pid) {
+  if (!state.answers[pid]) state.answers[pid] = { choice: null, rubric: {}, note: "", committed: false };
+  if (!state.answers[pid].rubric) state.answers[pid].rubric = {};
+  return state.answers[pid];
+}
+function setScore(pid, itemId, dim, v) {
+  var a = getAnswer(pid);
+  if (!a.rubric[itemId]) a.rubric[itemId] = {};
+  a.rubric[itemId][dim] = v;
+  save();
+}
+function pairComplete(pid) {
+  var a = state.answers[pid];
+  if (!a || !a.choice) return false;
+  var dims = state.blind.rubric_dims || [];
+  var p = state.blind.pairs[state.idx];
+  var need = ["left", "right"];
+  for (var s = 0; s < need.length; s++) {
+    var it = p[need[s]];
+    for (var d = 0; d < dims.length; d++) {
+      var v = a.rubric[it.item_id] && a.rubric[it.item_id][dims[d]];
+      if (!(v >= 1 && v <= 5)) return false;
+    }
+  }
+  return true;
+}
+function refreshNav(pid) { $("#btn-submit").disabled = !pairComplete(pid); }
+
+/* ---------- 揭盲（整对提交后） ---------- */
+function fetchKey(cb) {
+  if (state.keyLoaded) return cb();
+  fetch("key.json").then(function (r) {
+    if (!r.ok) throw new Error("key.json " + r.status);
+    return r.json();
+  }).then(function (j) { state.key = j; state.keyLoaded = true; cb(); })
+    .catch(function (e) { fatal("key.json 加载失败：" + e.message); });
+}
+var PV_LABEL = { AI: "AI 变式", family: "同源换数", ori: "母本·原题" };
+function renderReveal(p, a) {
+  fetchKey(function () {
+    var k = (state.key.pairs || []).find(function (x) { return x.pair_id === p.pair_id; });
+    if (!k) { $("#reveal-items").innerHTML = "<span class='muted'>key.json 中无该对</span>"; return; }
+    var html = "";
+    ["ori", "left", "right"].forEach(function (side) {
+      var it = k[side]; if (!it) return;
+      html += '<div class="item"><span class="pv ' + it.provenance + '">' +
+        (PV_LABEL[it.provenance] || esc(it.provenance)) + '</span>' +
+        '<span class="muted">' + esc(it.item_id) + (it.source_desc ? " · " + esc(it.source_desc) : "") + '</span>' +
+        '<div class="stmt">' + esc(p[side] ? p[side].statement_md : "") + '</div>' +
+        '<div class="note">答案：' + esc(it.answer || "—") + '</div>' +
+        '<div class="note">解析：' + esc(it.analysis || "—") + '</div></div>';
+    });
+    $("#reveal-items").innerHTML = html;
+    var v = $("#reveal-verdict");
+    if (a.choice === "unsure") { v.className = "verdict unsure"; v.textContent = "你选择了「分不出」。"; }
+    else if (a.choice === k.ai_side) { v.className = "verdict ok"; v.textContent = "你指认了 " +
+      (a.choice === "left" ? "左" : "右") + " 边 —— 识别正确（AI 题被识破，可写破绽备注）。"; }
+    else { v.className = "verdict bad"; v.textContent = "你指认了 " +
+      (a.choice === "left" ? "左" : "右") + " 边 —— 实际 AI 在" + (k.ai_side === "left" ? "左" : "右") +
+      "边（误判：把换数题当成了 AI）。"; }
+    var note = $("#pair-note");
+    note.value = a.note || "";
+    note.oninput = function () { getAnswer(p.pair_id).note = note.value; save(); };
+  });
+}
+
+/* ---------- 统计与导出 ---------- */
+function computeStats() {
+  /* 分桶（M-2）：ai_second 对（对照也是 AI）单列，不混入 family 主口径 */
+  var mkBucket = function () { return { decisive: 0, correct: 0, unsure: 0 }; };
+  var buckets = { all: mkBucket(), family: mkBucket(), ai_second: mkBucket() };
+  var rub = { judged_ai: {}, judged_family: {}, unsure: {} };
+  var flaws = [];
+  var notInKey = 0;
+  state.blind.pairs.forEach(function (p) {
+    var a = state.answers[p.pair_id];
+    if (!a || !a.choice) return;
+    var k = state.keyLoaded && state.key &&
+      (state.key.pairs || []).find(function (x) { return x.pair_id === p.pair_id; });
+    if (!k) { notInKey++; return; }
+    var bk = k.control_kind === "ai_second" ? "ai_second" : "family";
+    if (a.choice === "unsure") {
+      buckets.all.unsure++; buckets[bk].unsure++;
+    } else {
+      buckets.all.decisive++; buckets[bk].decisive++;
+      if (a.choice === k.ai_side) {
+        buckets.all.correct++; buckets[bk].correct++;
+        flaws.push({ pair_id: p.pair_id, kp: p.kp, side: a.choice,
+                     statement: (p[a.choice].statement_md || "").slice(0, 120),
+                     note: a.note || "" });
+      }
+    }
+    Object.keys(a.rubric || {}).forEach(function (itemId) {
+      /* 分组按「题」不按「对」：被指认为 AI 的题 vs 被指认为原题的题（该对另一道） */
+      var g = a.choice === "unsure" ? "unsure"
+        : (k[a.choice] && k[a.choice].item_id === itemId ? "judged_ai" : "judged_family");
+      var dims = a.rubric[itemId];
+      Object.keys(dims).forEach(function (dim) {
+        var v = dims[dim];
+        if (!(v >= 1 && v <= 5)) return;
+        var b = rub[g][dim] || (rub[g][dim] = { s: 0, n: 0 });
+        b.s += v; b.n++;
+      });
+    });
+  });
+  var means = {};
+  Object.keys(rub).forEach(function (g) {
+    means[g] = {};
+    Object.keys(rub[g]).forEach(function (dim) {
+      means[g][dim] = rub[g][dim].n ? +(rub[g][dim].s / rub[g][dim].n).toFixed(3) : null;
+    });
+  });
+  function bstat(b) {
+    var rate = b.decisive ? b.correct / b.decisive : null;
+    return { decisive: b.decisive, correct: b.correct, unsure: b.unsure,
+             detection_rate: rate, wilson95: wilson(b.correct, b.decisive) };
+  }
+  var out = {}; Object.keys(buckets).forEach(function (k) { out[k] = bstat(buckets[k]); });
+  return { pairs_scored: out.all.decisive + out.all.unsure,
+           decisive: out.all.decisive, correct: out.all.correct, unsure: out.all.unsure,
+           detection_rate: out.all.detection_rate, wilson95: out.all.wilson95,
+           baseline: 0.5, buckets: out, results_not_in_key: notInKey,
+           rubric_means: means, flaws: flaws };
+}
+
+function bucketCard(label, b) {
+  var rate = b.detection_rate == null ? "—" : Math.round(b.detection_rate * 100) + "%";
+  var ci = b.wilson95 ? Math.round(b.wilson95[0] * 100) + "–" + Math.round(b.wilson95[1] * 100) + "%" : "—";
+  return '<div class="stat"><b>' + rate + '</b><span class="muted">' + label +
+    '<br>' + b.correct + "/" + b.decisive + ' 决对 · CI ' + ci + '</span></div>';
+}
+function renderResults() {
+  fetchKey(function () {
+    $("#view-pair").classList.add("hidden");
+    $("#view-results").classList.remove("hidden");
+    var s = computeStats();
+    $("#stat-cards").innerHTML =
+      bucketCard("全量区分率（主口径·含双 AI 对）", s.buckets.all) +
+      bucketCard("family 桶（AI vs 族换数）", s.buckets.family) +
+      bucketCard("ai_second 桶（双 AI·参考）", s.buckets.ai_second) +
+      '<div class="stat"><b>' + s.unsure + '</b><span class="muted">「分不出」对数（单列）</span></div>' +
+      '<div class="stat"><b>50%</b><span class="muted">瞎猜基线（全量桶）</span></div>';
+    var read = "解读（对全量/family 桶）：区间下界 &gt; 50% → AI 变式可被稳定识破（有破绽）；" +
+      "区间覆盖 50% → 暂无区分信号；上界 &lt; 50% → AI 变式反而更像人出的题。" +
+      "ai_second 桶两道都是 AI（无族对照），区分的是两次生成风格差异，仅参考、不进主结论。" +
+      "决断样本少时区间宽，结论谨慎。";
+    if (s.buckets.all.decisive < 10) read += " 当前全量决断对数 &lt; 10，仅作方向性参考。";
+    $("#stat-read").innerHTML = read;
+    var dims = state.blind.rubric_dims || [];
+    var head = "<tr><th>维度</th><th>被指认为 AI</th><th>被指认为原题</th><th>分不出</th></tr>";
+    var body = dims.map(function (d) {
+      function m(g) { var v = s.rubric_means[g][d]; return v == null ? "—" : v + " 分"; }
+      return "<tr><td>" + esc(d) + "</td><td>" + m("judged_ai") + "</td><td>" +
+        m("judged_family") + "</td><td>" + m("unsure") + "</td></tr>";
+    }).join("");
+    $("#rubric-table").innerHTML = head + body;
+    $("#flaw-preview").textContent = flawMD(s) || "（暂无被识破的 AI 题）";
+  });
+}
+
+function mdEscape(s) { return String(s || "").replace(/\|/g, "\\|").replace(/\n/g, " "); }
+function flawMD(s) {
+  if (!s.flaws.length) return "";
+  var rows = s.flaws.map(function (f) {
+    return "| " + f.pair_id + " | " + mdEscape(f.kp) + " | " + mdEscape(f.statement) +
+      " | " + (f.side === "left" ? "左" : "右") + "=AI（识破） | " + mdEscape(f.note) + " |";
+  });
+  return ["# 盲评破绽清单 · " + state.session,
+          "", "- 判据：AI 变式被正确指认（识破）的对；完整数据见 results JSON。",
+          "", "| 对 | 考点 | 题目摘要 | 指认 | 备注 |", "|---|---|---|---|---|"]
+    .concat(rows).join("\n");
+}
+function exportJSON() {
+  var s = computeStats();
+  var results = state.blind.pairs.map(function (p) {
+    var a = state.answers[p.pair_id] || {};
+    return { pair_id: p.pair_id, kp: p.kp, choice: a.choice || null,
+             rubric: a.rubric || {}, note: a.note || "", committed: !!a.committed };
+  });
+  var payload = { tool: "blind_eval_page", session: state.session,
+                  exported_at: new Date().toISOString(),
+                  results: results,
+                  stats: { decisive: s.decisive, correct: s.correct, unsure: s.unsure,
+                           detection_rate: s.detection_rate, wilson95: s.wilson95,
+                           baseline: s.baseline, buckets: s.buckets,
+                           rubric_means: s.rubric_means, flaws: s.flaws } };
+  download("blind_eval_results_" + state.session + ".json",
+           JSON.stringify(payload, null, 1), "application/json");
+}
+function download(name, text, mime) {
+  var b = new Blob([text], { type: mime + ";charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name; a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+
+/* ---------- 启动 ---------- */
+function fatal(msg, title) {
+  /* msg 按富文本处理（调用方自行 esc 动态片段） */
+  $("#fatal").classList.remove("hidden");
+  $("#fatal").innerHTML = "<b>" + esc(title || "无法开始盲评") + "：</b><br>" + msg;
+}
+function boot() {
+  fetch("blind.json").then(function (r) {
+    if (!r.ok) throw new Error("blind.json HTTP " + r.status);
+    return r.json();
+  }).then(function (j) {
+    if (!j.pairs || !j.pairs.length) {
+      /* m-5：空 session 给明确提示，而不是误导性的「加载失败」 */
+      fatal("本 session 没有任何可评对（构建时全部被跳过）。请查看本目录 " +
+            "<code>manifest.json</code> 的 skipped 清单定位原因（常为 AI 变式未过验证链、" +
+            "锚池主观题不足或撞题），或换有族考点重新构建。", "本 session 无题");
+      return;
+    }
+    state.blind = j;
+    state.session = j.session || "session";
+    $("#session-label").textContent = state.session + "（" + j.pairs.length + " 对）";
+    var saved = loadSaved();
+    if (saved && saved.answers) {
+      state.answers = saved.answers; state.idx = saved.idx || 0;
+    }
+    state.idx = Math.min(Math.max(state.idx, 0), j.pairs.length - 1);
+    renderPair();
+  }).catch(function (e) {
+    fatal("blind.json 加载失败（" + esc(e.message) + "）。file:// 直接打开会被浏览器拦截，" +
+          "请在本目录起本地服务：<code>python -m http.server 8139</code>，" +
+          "然后访问 <code>http://127.0.0.1:8139/index.html</code>（详见 README）。");
+  });
+
+  $("#btn-prev").onclick = function () { if (state.idx > 0) { state.idx--; save(); renderPair(); window.scrollTo(0, 0); } };
+  $("#btn-next").onclick = function () {
+    if (state.idx < state.blind.pairs.length - 1) { state.idx++; save(); renderPair(); window.scrollTo(0, 0); }
+  };
+  $("#btn-submit").onclick = function () {
+    var p = state.blind.pairs[state.idx];
+    getAnswer(p.pair_id).committed = true;
+    save(); renderPair();
+  };
+  $("#btn-results").onclick = renderResults;
+  $("#btn-back").onclick = function () {
+    $("#view-results").classList.add("hidden");
+    $("#view-pair").classList.remove("hidden");
+    renderPair();
+  };
+  $("#btn-restart").onclick = function () {
+    if (!confirm("清空本 session 的全部本地作答并从头开始？")) return;
+    localStorage.removeItem(storageKey());
+    location.reload();
+  };
+  $("#btn-export-json").onclick = exportJSON;
+  $("#btn-export-md").onclick = function () {
+    download("blind_eval_flaws_" + state.session + ".md", flawMD(computeStats()), "text/markdown");
+  };
+}
+boot();
+</script>
+</body>
+</html>

@@ -26,11 +26,12 @@ import re
 import sqlite3
 from datetime import date, timedelta
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 import assembler
+import distill
 import mem2
 import pack_loader
 import policy2
@@ -367,6 +368,36 @@ def _resolve_pack(pack_id: str | None, kp_id: str) -> tuple[dict | None, dict]:
 # --------------------------------------------------------------------------- #
 # 1. 出题
 # --------------------------------------------------------------------------- #
+def _memory_block_for(kp_id: str, exclude_event_ids=None) -> str:
+    """召回该 kp 的学生错因记忆并渲染为出题注入块（模块 F3：记忆×出题闭环）。
+
+    - 空库/新学生（无任何作答事件）或无错题历史 → ""：不注入，出题 prompt 与
+      无记忆版逐字节一致（缓存键稳定，demo 预热缓存不破）。
+    - exclude_event_ids：透传 mem2.recall_for_generation——变式场景传源题事件 id，
+      把源题从记忆摘录中剔除（源题题面已随 variant_of 进【变式要求】，不剔除就是
+      同一题面双重注入；归因统计仍保留，见 mem2 侧注释）。
+    - 只在真正走到 LLM 出题路径时调用（包内族/demo 引导路径提前 return，不多查库）。
+    - 召回/渲染任何异常都吞掉返回 ""——记忆注入是增强项，绝不阻塞出题主链。
+    - 红线：sim 隔离由 get_conn() 决定（本函数只认当前请求的库连接，模拟器数据
+      走独立 sim 库连接，绝不混入默认库）。
+    """
+    try:
+        conn = get_conn()
+        try:
+            recall = mem2.recall_for_generation(conn, kp_id,
+                                                exclude_event_ids=exclude_event_ids)
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 —— 召回失败不阻塞出题
+        return ""
+    if not recall:
+        return ""
+    try:
+        return mem2.format_memory_block(recall) or ""
+    except Exception:  # noqa: BLE001 —— 渲染失败同样不阻塞出题
+        return ""
+
+
 @router.post("/turn")
 def v2_turn(body: TurnBody):
     """选包 → 取 kp（中文 name）→ 出题（填空=绿标计算链）。
@@ -430,7 +461,13 @@ def v2_turn(body: TurnBody):
 
     try:
         # kp_context 只传中文 name —— 与 v1 /generate 完全一致的载荷，保证家族路由命中与缓存复用
-        q = generate_question({"kp": kp["name"]}, difficulty=body.difficulty, qtype=gen_qtype)
+        kp_context = {"kp": kp["name"]}
+        # 模块 F3：注入学生错因记忆（空库/新学生 → 空块 → kp_context 与旧版逐字节一致）；
+        # 仅 LLM 路径走到这里——包内族/家族确定性出题不消费 prompt，注入无副作用
+        memory_block = _memory_block_for(body.kp_id)
+        if memory_block:
+            kp_context["memory_context"] = memory_block
+        q = generate_question(kp_context, difficulty=body.difficulty, qtype=gen_qtype)
     except Exception as e:  # noqa: BLE001 —— 生成链任何异常都降级为 ok:false，绝不 500
         return {"ok": False, "code": "generation_failed",
                 "reason": _sanitize_reason(f"出题失败：{e}"), "pack_id": pack_id,
@@ -461,8 +498,45 @@ def v2_turn(body: TurnBody):
 # --------------------------------------------------------------------------- #
 # 2. 作答闭环
 # --------------------------------------------------------------------------- #
+def _maybe_schedule_distill(background_tasks: BackgroundTasks, conn,
+                            pack_id: str, kp_id: str) -> None:
+    """模块 G 接线：作答落库后的薄弱模式卡后台蒸馏调度。
+
+    - 先纯 SQL 阈值预判（distill.distill_status，复用当前请求 conn，零 LLM、
+      零额外连接）：不满足直接返回，常态每次作答只有两条 COUNT 级查询开销；
+      满足（due=True）才挂后台任务。
+    - 蒸馏本体（含秒级 LLM 调用）走 FastAPI BackgroundTasks——定案理由：
+      /v2/answer、/v2/selfassess 是同步 def 端点，同步蒸馏会在触发阈值命中的
+      那次作答响应里引入秒级延迟，违背「后台增强不允许打断学生练习」红线；
+      BackgroundTasks 在响应发出后执行，失败也不影响已返回的响应。
+      档案库 contextvar（X-MF-Profile）经 anyio to_thread 的 context 拷贝
+      传入后台任务线程，_distill_task 内 get_conn() 仍落正确的档案库；
+      TestClient 下后台任务随响应同步执行完毕，集成测试可断言卡片已写。
+    - 预判/调度任何异常都静默跳过：蒸馏是增强项，绝不阻断作答主链。
+    """
+    try:
+        due = bool(distill.distill_status(conn, pack_id, kp_id).get("due"))
+    except Exception:  # noqa: BLE001
+        return
+    if due:
+        background_tasks.add_task(_distill_task, pack_id, kp_id)
+
+
+def _distill_task(pack_id: str, kp_id: str) -> None:
+    """后台蒸馏任务：自开连接（sim 隔离/档案隔离均由 get_conn() 决定；
+    绝不自连默认库）。maybe_distill 内部已绝不抛出，此处再兜一层保险。"""
+    try:
+        conn = get_conn()
+        try:
+            distill.maybe_distill(conn, pack_id, kp_id)
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 —— 后台增强失败不留痕迹、不影响任何请求
+        pass
+
+
 @router.post("/answer")
-def v2_answer(body: AnswerBody):
+def v2_answer(body: AnswerBody, background_tasks: BackgroundTasks):
     """判分（SymPy 等价）→ 归因（override 优先）→ 写事件流 → 投影 → P1-P6 决策。"""
     # 解析预检（2026-09-12 P0）：学生输入不可解析时【不记事件、不出决策】——
     # 这类输入判分恒 False 但零学习信号，记入只会污染记忆与蒸馏。
@@ -497,6 +571,15 @@ def v2_answer(body: AnswerBody):
         "stmt_summary": _safe_trunc_math(body.statement_md or "", 160),
         "standard_summary": _safe_trunc_math(body.standard_answer or "", 160),
         "difficulty": body.difficulty,
+        # F1（记忆×出题闭环）：题面/学生答案原文截断存档，供 mem2.recall_for_generation
+        # 召回「最近错题摘录」注入出题 prompt（q=题面[数学安全截断,≤240]，
+        # ans=学生答案[:80]）。q 复用 _safe_trunc_math：与 stmt_summary 同口径，
+        # 不在 $...$ 数学区/LaTeX 命令中间切断（渲染安全）。
+        # 只对新事件生效：旧事件 meta 无此键，召回侧必须容错缺失。
+        # stmt_summary/standard_summary（160 字）保留不动：同题去重、/v2/variant
+        # 源题、复习卡等既有消费方沿用旧键。
+        "q": _safe_trunc_math(body.statement_md or "", 240),
+        "ans": (body.student_answer or "")[:80],
     }
     conn = get_conn()
     # 作答通道（任务书 P2-b）：answer=常规作答；variant=AI 变式作答（同核不同壳）。
@@ -565,6 +648,10 @@ def v2_answer(body: AnswerBody):
             meta={**meta, "parse_ok": True, "q_fp": body.question_fp or None},
             sim=0,
         )
+        # 模块 G：作答落库后蒸馏预判（纯 SQL，不满足零开销）→ 命中才挂后台任务。
+        # 置于 _load_pack 之前：包不可用提前 return 的路径同样获得蒸馏机会。
+        # retry/duplicate/parse_error 路径不经过此处——retry 事件本就不进蒸馏窗口。
+        _maybe_schedule_distill(background_tasks, conn, body.pack_id, body.kp)
         pack = _load_pack(body.pack_id)
         if pack is None:
             return {"ok": True, "correct": correct, "attribution": attribution,
@@ -719,7 +806,7 @@ def _mastery_after(pack_id: str, kp: str, conn) -> dict | None:
 
 
 @router.post("/selfassess")
-def v2_selfassess(body: SelfAssessBody):
+def v2_selfassess(body: SelfAssessBody, background_tasks: BackgroundTasks):
     """解答题三档自评：映射 result → 写 selfassess 事件 → 返回 mastery_after。
 
     底座=用户三档自评（D022 红线：绝不做机器判步骤分）；增强=可选 LLM 归因标签
@@ -748,9 +835,17 @@ def v2_selfassess(body: SelfAssessBody):
                   "step_count": len(body.student_steps),
                   # 题干/答案摘要：供复习卡「最近」与 /v2/variant 源题复用（B1 落库增强延伸）
                   "stmt_summary": _safe_trunc_math(body.statement_md or "", 160),
-                  "standard_summary": _safe_trunc_math(body.standard_answer or "", 160)},
+                  "standard_summary": _safe_trunc_math(body.standard_answer or "", 160),
+                  # F1（记忆×出题闭环）：自评也是作答落库——补题面/学生作答截断键，
+                  # 供 mem2.recall_for_generation 召回（旧事件无此键，召回侧容错缺失）。
+                  # q 用数学安全截断（与 /v2/answer 同口径），不在 LaTeX 命令中间切断
+                  "q": _safe_trunc_math(body.statement_md or "", 240),
+                  "ans": "\n".join(body.student_steps)[:80]},
             sim=0,
         )
+        # 模块 G：自评也是作答落库——同 /v2/answer 的蒸馏预判 + 后台调度
+        #（selfassess+partial 按错题口径计入，见 mem2._is_mistake_row）
+        _maybe_schedule_distill(background_tasks, conn, body.pack_id, body.kp)
         m = _mastery_after(body.pack_id, body.kp, conn)
     finally:
         conn.close()
@@ -1220,6 +1315,9 @@ def v2_intent(body: IntentBody):
     """意图条：解析一句话 → 槽位。命中才生成（调用方 /v2/variant），低置信回退不生成。
 
     每次解析落 mem2 事件（mode='intent'，meta 存 raw/slots/conf），不绕记忆闭环。
+    歧义透传（模块 E）：ambiguous=true 时响应带 alternatives（含首选的候选考点
+    清单），由前端弹确认卡让学生点选，再以选定 kp_id 走 /v2/variant —— 服务端
+    不改出题行为，单候选（ambiguous=false）响应与旧版逐字兼容。
     """
     res = _intent.parse(body.text)
     conn = get_conn()
@@ -1233,7 +1331,7 @@ def v2_intent(body: IntentBody):
             result="hit" if res.get("ok") else "miss",
             meta={"raw": (body.text or "")[:200], "slots": res.get("slots"),
                   "confidence": res.get("confidence"), "reason": res.get("reason"),
-                  "second": res.get("second")},
+                  "second": res.get("second"), "ambiguous": bool(res.get("ambiguous"))},
             sim=0,
         )
     finally:
@@ -1243,7 +1341,9 @@ def v2_intent(body: IntentBody):
         return {"ok": False, "confidence": res.get("confidence"),
                 "reason": res.get("reason"), "fallback": rec}
     return {"ok": True, "slots": res["slots"], "confidence": res["confidence"],
-            "second": res.get("second")}
+            "second": res.get("second"),
+            "ambiguous": bool(res.get("ambiguous")),
+            "alternatives": res.get("alternatives") or []}
 
 
 @router.get("/recommend-start")
@@ -1323,14 +1423,32 @@ def _variant_with_source(pack: dict, kp: dict, src: dict, body: VariantBody) -> 
                 "changes": changes, "consistency": True}
         return _variant_response(pack_id, kp, q, body, prov), "history-family"
 
-    # 无确定性族 → LLM 变式链（非 demo）；demo → 拒绝
+    # 无确定性族 → 模块 L 重算器先查（命中 → schema-gated 重算链，答案 SymPy 可验证）；
+    # demo → 拒绝（重算链需 LLM 出网，demo 不进入——载荷逐字节不变）；
+    # 未命中 → 既有 LLM 变式链。调用序定案：包内族参数扰动 > demo 拒绝 > 重算器 > LLM 变式。
     if os.environ.get("MATHFORGE_DEMO") == "1":
         return {"ok": False, "code": "variant_llm_unavailable", "pack_id": pack_id,
                 "kp": _kp_view(kp), "reason": "该考点无确定性模板族，变式需联网生成，演示模式不可用"}, "refused"
+    try:  # m2（对抗审查）：import 与接入同入 try，对齐旧链风格——接入层故障不 500
+        import recompute as _rc
+        if _rc.spec_for_kp(kp["id"], kp.get("name")) is not None:
+            return _recompute_variant_with_source(pack_id, kp, src, body)
+    except Exception as e:  # noqa: BLE001 —— 与旧链同口径：失败不 500
+        return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
+                "reason": _sanitize_reason(f"变式生成失败：{e}")}, "failed"
     try:
         from generate import generate_variant
         src_q = {"statement_md": src["stmt_summary"], "answer_sympy": src["standard_summary"]}
-        q = generate_variant(kp["name"], src_q)
+        # 模块 F3：变式流也注入学生错因记忆（非家族 kp 的 LLM 变式路径）。
+        # exclude_event_ids=源题事件：源题题面已随 variant_of 进【变式要求】，从记忆
+        # 摘录剔除同一事件，避免题面双重注入（其归因统计仍保留进记忆块）。
+        # 空库/新学生 → None → generate_variant kp_context 与旧版逐字节一致
+        src_event_id = src.get("event_id")
+        q = generate_variant(
+            kp["name"], src_q,
+            memory_context=_memory_block_for(
+                body.kp_id,
+                exclude_event_ids={src_event_id} if src_event_id else None) or None)
         changes = [{"type": "llm_variant", "desc": "基于源题的 LLM 变式（验证链对账）"}]
         prov = {"source_kind": "history", "source_summary": _safe_trunc_math(src["stmt_summary"]),
                 "changes": changes, "consistency": bool(q.get("verify_level") == "green")}
@@ -1340,12 +1458,41 @@ def _variant_with_source(pack: dict, kp: dict, src: dict, body: VariantBody) -> 
                 "reason": _sanitize_reason(f"变式生成失败：{e}")}, "failed"
 
 
+def _recompute_variant_with_source(pack_id: str, kp: dict, src: dict, body: VariantBody):
+    """模块 L：有源题、无族、重算器命中 → schema-gated 重算链变式（先于旧 LLM 变式链）。
+
+    LLM 只填结构化 schema 与题面包装，答案由 v2/recompute.py 用 SymPy 重算给出
+    （claimed_answer 不采信）；链内已含重生成 1 次 + 盲解对账 + FAKE_KP 闸门（模块 J
+    语义复用）。重算链 blocked → 与既有 LLM 变式链失败同构返回 variant_failed
+    （人话原因），绝不 500、绝不假装成功。记忆注入与旧链同款（剔除源题事件防双重注入）。
+    """
+    import recompute as _rc
+    src_event_id = src.get("event_id")
+    try:
+        q = _rc.generate_recompute_variant(
+            _rc.spec_for_kp(kp["id"], kp.get("name")),
+            src.get("difficulty") or body.difficulty or "基础",
+            memory_context=_memory_block_for(
+                body.kp_id,
+                exclude_event_ids={src_event_id} if src_event_id else None) or None)
+    except Exception as e:  # noqa: BLE001 —— 与既有 LLM 变式链同口径：失败不 500
+        q = {"status": "blocked_pending_human", "error": str(e)}
+    if q.get("status") == "blocked_pending_human" or not q.get("statement_md"):
+        return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
+                "reason": _sanitize_reason(f"变式生成失败：{q.get('error') or '重算未通过'}")}, "failed"
+    prov = {"source_kind": "history", "source_summary": _safe_trunc_math(src["stmt_summary"]),
+            "changes": [{"type": "recompute_variant", "desc": "AI 情境化变式（重算器验证）"}],
+            "consistency": True}
+    return _variant_response(pack_id, kp, q, body, prov), "history-recompute"
+
+
 class VariantAiBody(BaseModel):
     pack_id: str | None = None   # 缺省按 kp 全局路由（与 VariantBody 一致——前端从不传 pack_id）
     kp_id: str
     seed: int | None = None
     k: int = 3
     strategy: str | None = None   # None=按记忆自动选择；显式 contextual|multistep 覆盖
+    difficulty: str | None = None  # 模块 L：重算器命中的无族 kp 用（UI body 本就可能携带）
 
 
 def _pick_variant_strategy(conn: sqlite3.Connection, kp_id: str) -> str:
@@ -1365,6 +1512,45 @@ def _pick_variant_strategy(conn: sqlite3.Connection, kp_id: str) -> str:
     if mem2._streak_correct(conn, kp_id) >= 2:
         return "multistep"
     return "contextual"
+
+
+def _recompute_ai_variant(pack_id: str, kp: dict, body: "VariantAiBody") -> dict:
+    """模块 L：重算器命中 kp 的 AI 变式（/v2/variant/ai 无族分支专用，2026-09-29）。
+
+    LLM 只填结构化 schema 与题面包装，答案由 SymPy 重算给出（v2/recompute.py 终审；
+    链内含重生成 1 次 + 盲解对账 + FAKE_KP 问法合规闸门——语义与绿标链一致）。
+    链 blocked（重算不过/盲解不合/问法合规拦截）→ 返回 variant_failed + 人话原因：
+    比 no_kernel（"需先建族"）诚实——问题不在缺族，在本次生成未过验证；UI 侧会照常
+    回落 /v2/variant 既有降级链。demo 态不会进入本函数（调用方已守卫，载荷不变）。
+    """
+    import recompute as _rc
+    try:
+        # AI 变式缺省进阶档：AI 情境化变式定位即超基础档练习（contextual/multistep 同款），
+        # 且锚池主流包装形态（指定点二阶导）在进阶档；UI 显式传 difficulty 则从请求。
+        q = _rc.generate_recompute_variant(
+            _rc.spec_for_kp(body.kp_id, kp.get("name")),
+            getattr(body, "difficulty", None) or "进阶",
+            memory_context=_memory_block_for(body.kp_id) or None)
+    except Exception as e:  # noqa: BLE001 —— 链外异常同口径转拦截，不 500
+        q = {"status": "blocked_pending_human", "error": str(e)}
+    if q.get("status") == "blocked_pending_human" or not q.get("statement_md"):
+        return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
+                "reason": _sanitize_reason(f"AI 重算变式不可用：{q.get('error') or '重算未通过'}")}
+    provenance = {
+        "source_kind": "ai_variant",
+        "source_summary": None,
+        "changes": [{"type": "recompute_variant", "desc": "AI 情境化变式（重算器验证）"}],
+        "consistency": True,
+    }
+    vb = VariantBody(pack_id=pack_id, kp_id=body.kp_id, qtype="fill",
+                     difficulty=q.get("difficulty") or "基础")
+    out = _variant_response(pack_id, kp, q, vb, provenance)
+    # variant_meta.engine="recompute"：ui2.renderVariantMeta 对非 ai/非 degraded 引擎
+    # 不渲染「AI 暂不可用」横幅（L4 定案：ui2 零改动）；mode 口径 engine==='ai' 才记
+    # 'variant'，recompute 走 'answer' 通道（作答统计语义安全）。
+    out["variant_meta"] = {"engine": "recompute", "degraded": False,
+                           "target": (q.get("recompute") or {}).get("target")}
+    return out
 
 
 @router.post("/variant/ai")
@@ -1389,6 +1575,18 @@ def v2_variant_ai(body: VariantAiBody):
     seed = body.seed if body.seed is not None else _random.randrange(2 ** 31)
     kernel = _try_pack_family(pack, body.kp_id, seed=seed)
     if kernel is None:
+        # 模块 L（求导类重算器试点）：调用序定案 包内族 > 重算器 > ai_variant 旧逻辑
+        # （族上换壳/参数扰动降级）> no_kernel 拒绝。无族 kp 先查重算器注册表：
+        # 命中且在线态 → schema-gated 重算链出「包装过的、SymPy 可验证答案」的 AI 变式，
+        # 不再走「需先建族」拒绝；未命中 / demo 态 → 维持原拒绝（demo 载荷逐字节不变）。
+        try:  # m2（对抗审查）：import 与接入同入 try——接入层故障转人话失败，不 500 不谎报缺族
+            import recompute as _rc
+            if _rc.spec_for_kp(body.kp_id, kp.get("name")) is not None \
+                    and os.environ.get("MATHFORGE_DEMO") != "1":
+                return _recompute_ai_variant(pack_id, kp, body)
+        except Exception as e:  # noqa: BLE001 —— 接入层故障与旧链同口径
+            return {"ok": False, "code": "variant_failed", "pack_id": pack_id, "kp": _kp_view(kp),
+                    "reason": _sanitize_reason(f"AI 重算变式不可用：{e}")}
         return {"ok": False, "code": "no_kernel", "pack_id": pack_id, "kp": _kp_view(kp),
                 "reason": "该考点暂无确定性数学核（模板族），AI 变式需先建族"}
 
@@ -1489,13 +1687,23 @@ def v2_daily(day: str | None = None, limit: int = 12):
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT ts, kp, qtype, mode, result, meta FROM attempt_events "
+            "SELECT ts, kp, qtype, mode, result, meta, pack FROM attempt_events "
             "WHERE day=? AND mode IN ('answer','selfassess','intent') "
             "ORDER BY ts DESC LIMIT ?", (day, int(limit))
         ).fetchall()
     finally:
         conn.close()
     items = []
+    # 模块 G 对抗审查修复（minor）：查卡 pack 与 recall_for_generation 同口径——
+    # 取该 kp 最近一条事件的 pack 列（rows 按 ts DESC，首次出现即最近），不再
+    # 依赖 kp_meta 的包结构映射。此前用 kp_meta 查卡、recall 用事件 pack 查卡，
+    # 客户端 pack 口径漂移（错挂 pack_id）时同一张卡两条读路径指向不同键。
+    # 事件 pack 为空（intent 等不绑定 pack 的事件）回退 kp_meta 兜底。
+    latest_pack: dict = {}
+    for r in rows:
+        kp = r[1]
+        if kp and kp not in latest_pack:
+            latest_pack[kp] = r[6] or ""
     for r in rows:
         meta = json.loads(r[5]) if r[5] else {}
         items.append({
@@ -1505,7 +1713,38 @@ def v2_daily(day: str | None = None, limit: int = 12):
             "stmt": _safe_trunc_math(meta.get("stmt_summary") or meta.get("raw") or "", 140),
             "rule": meta.get("rule"),
         })
-    return {"day": day, "items": items}
+    # 模块 G（查询侧）：近况透出薄弱模式卡——patterns_get 无既有读端点（grep 定案），
+    # 故按规格在 /v2/daily 加可选字段 patterns（当日出现过的 kp 有卡才出现，键可缺席；
+    # 不开新端点不开新页面）。confirmed=False 的自动蒸馏卡同样透出并标注 source，
+    # 供 UI 区分 rule/auto_distill；卡是学习建议，不是判分依据（红线语义随字段透出）。
+    # pack 口径见上方 latest_pack 注释（与 recall 一致的事件 pack 优先）。
+    patterns_out: list[dict] = []
+    day_kps = sorted({it["kp_id"] for it in items if it["kp_id"]})
+    if day_kps:
+        conn = get_conn()
+        try:
+            for kp_id in day_kps:
+                pack_id = latest_pack.get(kp_id) or \
+                    (kp_meta.get(kp_id) or {}).get("pack_id")
+                if not pack_id:
+                    continue
+                card = mem2.patterns_get(conn, pack_id, kp_id)
+                if not card:
+                    continue
+                patterns_out.append({
+                    "kp": kp_id,
+                    "kp_name": (kp_meta.get(kp_id) or {}).get("name") or kp_id,
+                    "pack_id": pack_id,
+                    "pattern_md": card.get("pattern_md"),
+                    "source": card.get("source"),
+                    "confirmed": card.get("confirmed"),
+                })
+        finally:
+            conn.close()
+    resp = {"day": day, "items": items}
+    if patterns_out:
+        resp["patterns"] = patterns_out
+    return resp
 
 
 @router.get("/patterns")
@@ -1562,6 +1801,12 @@ def v2_patterns(limit: int = 8):
     try:
         for it in out[:int(limit)]:
             try:
+                # 模块 G：LLM 自动蒸馏卡（source=auto_distill）不被规则卡降级覆盖——
+                # rule 物化只补空缺。auto 卡由蒸馏器按窗口事件+归因重算，信息量
+                # 高于规则聚合文案；UI 轮询本端点时不得把 auto 卡冲掉。
+                existing = mem2.patterns_get(conn, it["pack_id"], it["kp"])
+                if existing and existing.get("source") == "auto_distill":
+                    continue
                 mem2.patterns_set(conn, it["pack_id"], it["kp"],
                                   f"{it['pattern']}。{it['advice']}",
                                   source="rule", confirmed=False)

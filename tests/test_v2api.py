@@ -193,7 +193,9 @@ def _turn_fresh(client, kp_id="calc.rolle", tries=10):
 
 
 def test_answer_correct_closes_loop(client):
-    t = _turn(client)
+    # _turn_fresh：抽「没答过」的新题——rolle 参数空间仅 12 格，_turn 撞指纹会被
+    # 服务端同题去重拦截（duplicate 不落事件），导致本组用例概率性失败（2026-09-28 修）。
+    t = _turn_fresh(client)
     q = t["question"]
     r = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
@@ -213,7 +215,7 @@ def test_answer_correct_closes_loop(client):
 def test_answer_wrong_llm_attribution(client):
     """答错未给 override → 走 attribute_error（演示模式兜底「未归因」，不阻塞闭环，
     且不再假称「计算失误」污染记忆——P0 2026-09-12）。"""
-    t = _turn(client)
+    t = _turn_fresh(client)  # 同上：抽没答过的题，避开同题去重
     q = t["question"]
     d = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",
@@ -227,7 +229,7 @@ def test_answer_wrong_llm_attribution(client):
 
 
 def test_answer_attribution_override_wins(client):
-    t = _turn(client)
+    t = _turn_fresh(client)  # 同上：抽没答过的题，避开同题去重
     q = t["question"]
     d = client.post("/v2/answer", json={
         "pack_id": t["pack_id"], "kp": t["kp"]["id"], "qtype": "fill",

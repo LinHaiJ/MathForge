@@ -3,7 +3,8 @@
 - 家族 kp：确定性族内换参出变式（零 API、构造即正确），溯源块字段完整
 - 题库斜杠路径 kp（无 params）：子串匹配家族，标注题型转换与新参数格
 - 非家族 kp：演示模式缓存未命中 → 走既有拦截链优雅降级（不崩溃、不出网）
-- /variant 端点闭环
+- v1 退役（2026-09-30）：/variant 端点随 v1 移除，对应端点用例删除；
+  generate_variant 引擎用例保留（generate 链路不变，v2 变式走 /v2/variant 另测）
 """
 
 import os
@@ -14,7 +15,6 @@ os.environ["MATHFORGE_DEMO"] = "1"  # 零 API：LLM 路径缓存未命中按拦�
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import db  # noqa: E402
 from families import enumerate_family  # noqa: E402
 from generate import generate_variant  # noqa: E402
 
@@ -63,21 +63,3 @@ def test_nonfamily_variant_demo_graceful_block():
                                           "qtype": "solution"})
     assert q.get("status") == "blocked_pending_human"
     assert q["variant"]["source_kp"] == "函数极限概念"  # 拦截卡仍带溯源块
-
-
-def test_variant_endpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "v.db")
-    from app import app
-    from fastapi.testclient import TestClient
-
-    client = TestClient(app)
-    src = _family_source()
-    r = client.post("/variant", json={
-        "kp": src["kp"], "source_statement_md": src["statement_md"],
-        "source_params": src["params"], "source_difficulty": "基础",
-        "source_qtype": "calculation"})
-    assert r.status_code == 200
-    d = r.json()["question"]
-    assert d.get("statement_md"), d.get("error")
-    assert d["variant"]["changed_params"]
-    assert d["variant"]["kp_consistent"] is True

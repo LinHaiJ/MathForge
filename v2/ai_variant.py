@@ -84,9 +84,18 @@ def gate_structure(v: dict) -> tuple[bool, str]:
 
 
 def _sym_normalize_free(expr: str):
+    """LLM answer_expr → SymPy 表达式（B1 终审收口）：必须走 verify._parse 沙箱。
+
+    裸 sp.sympify 的内层求值器自建命名空间残留真 builtins，绕过 _parse 沙箱——
+    审查员金丝雀（sympify("open(...)")）实测执行。_parse 的 dunder/引号入口预拒
+    异常由 gate_math 既有 try/except 转诚实 gate 失败；非 Expr 结果（列表/元组/
+    等式）显式拒绝，与 v2/recompute 的 B2 守卫同口径。"""
     import sympy as sp
-    from verify import normalize_expr
-    return sp.sympify(normalize_expr(expr))
+    from verify import _parse, normalize_expr
+    e = _parse(normalize_expr(expr))
+    if not isinstance(e, sp.Expr):
+        raise ValueError("answer_expr 不是单个数学表达式")
+    return e
 
 
 def gate_math(v: dict, kernel: dict) -> tuple[bool, str]:
@@ -109,8 +118,8 @@ def gate_math(v: dict, kernel: dict) -> tuple[bool, str]:
             if sp.simplify(a2 - b) == 0:
                 return True, "同构等价（变量改名）"
         return False, "漂移：与核答案不等价"
-    except Exception:  # noqa: BLE001
-        return False, "漂移：与核答案不等价"
+    except Exception as e:  # noqa: BLE001 —— 沙箱预拒/非 Expr/校验异常 → 诚实 gate 失败
+        return False, f"漂移：与核答案不等价（校验异常 {str(e)[:60]}）"
 
 
 def gate_diverse(stem: str, kernel_stem: str, siblings: list[str]) -> tuple[bool, str]:

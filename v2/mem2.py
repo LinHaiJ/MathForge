@@ -20,6 +20,14 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+# 幂等迁移机制（模块 C，2026-09-28）：v2 两表 DDL 已原样迁入迁移 0001_v2_tables。
+# 优先平铺导入（v2/ 在 sys.path，app.py / conftest / scripts 均如此）；
+# 以包形态导入 v2.mem2 时回落到相对导入。
+try:
+    from migrations import ensure_migrated
+except ImportError:  # pragma: no cover - 包形态导入兜底
+    from .migrations import ensure_migrated
+
 # 与 v1 db.py 同一定义：mathforge.db 位于仓库根目录（mem2.py 同目录）。
 # v1 db.py: DB_PATH = Path(__file__).resolve().parents[1] / "mathforge.db"
 DB_PATH = Path(__file__).resolve().parents[1] / "mathforge.db"
@@ -47,48 +55,14 @@ def default_db_path() -> Path:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """在同库新增 attempt_events 与 patterns 两表（不动 v1 三表）。幂等（IF NOT EXISTS）。"""
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS attempt_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts REAL,
-            day TEXT,
-            sim INTEGER DEFAULT 0,
-            pack TEXT,
-            kp TEXT,
-            qtype TEXT,
-            mode TEXT,
-            result TEXT,
-            attribution TEXT,          -- JSON: {"type":..., "conf":...}
-            user_override TEXT,       -- JSON: {"type":..., "conf":...}（人类修正）
-            policy_snapshot TEXT,     -- JSON
-            meta TEXT                 -- JSON: {"origin_event_id":...}
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS patterns (
-            id INTEGER PRIMARY KEY,
-            pack TEXT NOT NULL,
-            kp TEXT NOT NULL,
-            pattern_md TEXT,
-            source TEXT,
-            confirmed INTEGER DEFAULT 0,
-            created_ts REAL
-        )
-        """
-    )
-    # 索引：按 kp + ts 取最近事件
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_attempt_events_kp_ts ON attempt_events (kp, ts)"
-    )
-    # patterns 每张卡唯一对应 (pack, kp)，便于 upsert（v2 蒸馏器 TBD 占位）
-    conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uniq_patterns_pack_kp ON patterns (pack, kp)"
-    )
-    conn.commit()
+    """在同库新增 attempt_events 与 patterns 两表（不动 v1 三表）。幂等（IF NOT EXISTS）。
+
+    2026-09-28 起委托 v2/migrations.ensure_migrated：两表 + 两索引的 DDL 原样迁入
+    迁移 0001_v2_tables（IF NOT EXISTS 逐字未改），并登记 schema_migrations。
+    对外签名与行为不变：建好表、commit、幂等；对「已建好全部表的现有库」首次
+    执行零 DDL 副作用，仅正常登记。
+    """
+    ensure_migrated(conn)
 
 
 def connect(db_path=None) -> sqlite3.Connection:
@@ -486,6 +460,174 @@ def patterns_get(conn, pack: str, kp: str) -> dict | None:
     d = dict(row)
     d["confirmed"] = bool(d["confirmed"])
     return d
+
+
+# --------------------------------------------------------------------------- #
+# 出题侧错因记忆召回（模块 F：记忆×出题闭环，2026-09-29）
+# --------------------------------------------------------------------------- #
+# 召回窗口：取该 kp 最近 N 条作答事件（借鉴 CC memdir.findRelevantMemories——
+# 记忆不是全量搬，按 kp 相关性召回最近窗口注入）。
+RECALL_WINDOW = 8
+
+# 错题口径（与 project_mistakes 逐字一致）：result='wrong' 或自评「部分会」。
+def _is_mistake_row(mode: str, result: str) -> bool:
+    return result == "wrong" or (mode == "selfassess" and result == "partial")
+
+
+# attribute.py 归因失败时落库的是占位串「未归因」（低置信兜底，非真实错因）——
+# 记忆侧与 None 同等处理：不进 attribution_counts（否则块内出现「高频错因：未归因×1」
+# 的语义噪声）；摘录行由 format_memory_block 兜底标注「未归因」。
+_ATTR_PLACEHOLDER = "未归因"
+
+
+def _real_attr_type(attr) -> str | None:
+    """提取真实错因类型：None/空串/占位串「未归因」一律归一为 None。"""
+    t = attr.get("type") if isinstance(attr, dict) else None
+    if isinstance(t, str):
+        t = t.strip()
+        if t and t != _ATTR_PLACEHOLDER:
+            return t
+    return None
+
+
+def recall_for_generation(conn, kp: str, limit: int = 3,
+                          exclude_event_ids=None) -> dict | None:
+    """召回该 kp 的学生错因记忆，供出题侧注入 prompt（模块 F2，纯只读）。
+
+    ⚠️ 红线重申：本函数只认传入的 conn，sim 隔离由 conn 决定——模拟器调用方必须
+    传入指向 mathforge_sim.db 的独立连接，绝不混入默认库 mathforge.db（与模块头
+    注释同口径）；本函数不做任何写入。
+
+    口径：
+    - 窗口：该 kp 最近 RECALL_WINDOW(=8) 条作答事件，result IN (correct,wrong,partial)，
+      排除 mode IN (override,retry)——与 project_mastery 的取数口径一致；
+      不按 sim 过滤（与既有投影一致，隔离靠 conn）。
+    - 错题口径 = _is_mistake_row（与 project_mistakes 一致）；"wrong" 字段即该口径计数。
+    - 归因复用 _resolve_attribution：独立 override 事件 > 事件自身 user_override > attribution；
+      占位串「未归因」（attribute.py 归因失败兜底）与 None 同义——不进 attribution_counts，
+      摘录行标注「未归因」（见 _real_attr_type）。
+    - recent_wrongs[].q/ans 来自事件 meta 的 F1 落库键（题面/学生答案截断）：
+      旧事件 meta 无此键 → 键缺省（省略），绝不报错。
+    - exclude_event_ids：仅从 recent_wrongs 摘录中剔除的事件 id 集合。变式场景传源题
+      事件 id——源题题面已随 variant_of 进【变式要求】，再进记忆摘录就是同一题面双重
+      注入；被剔除事件仍计入 n/wrong/attribution_counts（归因统计不含题面，无重复问题）。
+    - pattern_card：patterns_get(conn, pack, kp) 的 pattern_md。recall 只收 kp 参数，
+      pack 取窗口内最近一条事件的 pack 列（同一 kp 的事件 pack 恒定，现实中无歧义；
+      pack 为空串时跳过查询）。
+
+    返回 None 当该 kp 无任何作答事件（调用侧零注入、prompt 与无记忆版逐字节一致）；
+    否则返回：
+      {"n": 窗口内事件数, "wrong": 窗口内错题数,
+       "attribution_counts": {错因类型: 次数},   # 仅错题参与计数；未归因/占位串不计
+       "recent_wrongs": [{day, attribution_type, q?, ans?}, ...],  # 最近 limit 条错题，新→旧
+       "pattern_card": str | None}
+    """
+    rows = conn.execute(
+        "SELECT * FROM attempt_events "
+        "WHERE kp=? AND result IN ('correct','wrong','partial') "
+        "AND mode NOT IN ('override','retry') "
+        "ORDER BY ts DESC, id DESC LIMIT ?",
+        (kp, RECALL_WINDOW),
+    ).fetchall()
+    if not rows:
+        return None
+
+    override_map = _latest_overrides(conn, None, kp)
+    attribution_counts: dict = {}
+    recent_wrongs: list[dict] = []
+    wrong_n = 0
+    for r in rows:
+        if not _is_mistake_row(r["mode"], r["result"]):
+            continue
+        wrong_n += 1
+        attr = _resolve_attribution(r, override_map.get(r["id"]))
+        attr_type = _real_attr_type(attr)
+        if attr_type:
+            attribution_counts[attr_type] = attribution_counts.get(attr_type, 0) + 1
+        # 摘录剔除（仅摘录，统计仍计入）：变式场景防源题题面双重注入
+        excluded = bool(exclude_event_ids) and r["id"] in exclude_event_ids
+        if len(recent_wrongs) < max(1, int(limit)) and not excluded:
+            entry: dict = {"day": r["day"], "attribution_type": attr_type}
+            meta = _parse_json(r["meta"])
+            if isinstance(meta, dict):
+                # F1 键（q=题面截断, ans=学生答案截断）：旧事件无此键 → 缺省省略
+                if meta.get("q"):
+                    entry["q"] = str(meta["q"])
+                if meta.get("ans"):
+                    entry["ans"] = str(meta["ans"])
+            recent_wrongs.append(entry)
+
+    pack = rows[0]["pack"] or ""
+    pattern_card = None
+    if pack:
+        card = patterns_get(conn, pack, kp)
+        if card:
+            pattern_card = card.get("pattern_md")
+
+    return {
+        "n": len(rows),
+        "wrong": wrong_n,
+        "attribution_counts": attribution_counts,
+        "recent_wrongs": recent_wrongs,
+        "pattern_card": pattern_card,
+    }
+
+
+def format_memory_block(recall: dict | None) -> str:
+    """把 recall_for_generation 的结果渲染为「学生错因记忆」文本块（模块 F3）。
+
+    该块由调用侧放进 kp_context["memory_context"]，generate._base_user 仅在非空时
+    追加到出题 prompt 末尾。空/无错题历史 → 返回 ""（不注入）：
+    - recall 为 None（无任何事件）或 wrong==0（无可瞄准的错因）都返回 ""，
+      保证新学生/全对学生的 prompt 与无记忆版逐字节一致（缓存键稳定）。
+
+    红线（写进块内指令）：绝不把学生历史写进题干——记忆只供出题瞄准，不进题面。
+    """
+    if not recall:
+        return ""
+    try:
+        wrong = int(recall.get("wrong") or 0)
+    except (TypeError, ValueError):
+        wrong = 0
+    if wrong <= 0:
+        return ""
+    try:
+        n = int(recall.get("n") or 0)
+    except (TypeError, ValueError):
+        n = 0
+
+    lines = ["【学生个人错因记忆（供出题参考，严禁在题干中提及或复述）】"]
+    head = f"- 该生近 {n} 次作答：错 {wrong} 次"
+    counts = recall.get("attribution_counts") or {}
+    if counts:
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], str(kv[0])))[:2]
+        head += "；高频错因：" + "、".join(f"{t}×{c}" for t, c in top)
+    lines.append(head)
+    for w in recall.get("recent_wrongs") or []:
+        if not isinstance(w, dict):
+            continue
+        attr_type = w.get("attribution_type") or "未归因"
+        seg = f"- 最近错题摘录：【{w.get('day', '')}|{attr_type}】"
+        if w.get("q"):
+            seg += f"题干摘录：{w['q']}"
+        if w.get("ans"):
+            seg += f"；学生答：{w['ans']}"
+        lines.append(seg)
+    card = str(recall.get("pattern_card") or "").strip()
+    if card:
+        lines.append(f"- 薄弱模式卡：{card[:160]}")
+    if counts:
+        # 有真实高频错因 → 主指令瞄准高频错因
+        aim = "针对高频错因设计陷阱与干扰项"
+    else:
+        # 全部错题未归因（counts 空，多为 attribute_error 占位/旧事件）→ 「高频错因」
+        # 指代悬空，指令降级到最近错题摘录
+        aim = "针对最近错题摘录的错因设计陷阱与干扰项"
+    lines.append(
+        f"- 出题指令：{aim}；变式题优先针对最近一次错因做扰动；"
+        "绝不把学生历史写进题干，也不得在题干/解析中提及该生的作答记录。"
+    )
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- #

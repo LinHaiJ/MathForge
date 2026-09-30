@@ -276,11 +276,61 @@ function renderEmpty(wrap) {
 }
 
 /* ---------- 页 A · 意图条 ---------- */
+/* 意图歧义确认卡（模块 E「问而不猜」）：解析命中一词多义（如「中值定理」→
+   拉格朗日/罗尔）时不直接出题，在意图条下方弹卡让学生点选考点。卡片按需创建、
+   关闭即移除——单候选（ambiguous=false）路径不产生任何 DOM 变化（零感知）。 */
+let __confirmOutside = null;   // 卡片打开期间的「点卡片外收起」监听
+
+function closeIntentConfirm() {
+  const el = $('#intent-confirm');
+  if (el) el.remove();
+  if (__confirmOutside) {
+    document.removeEventListener('click', __confirmOutside, true);
+    __confirmOutside = null;
+  }
+}
+
+function showIntentConfirm(alts, slots) {
+  closeIntentConfirm();
+  const bar = $('.intent-bar');
+  if (!bar || !alts || alts.length < 2) return;
+  const card = document.createElement('div');
+  card.id = 'intent-confirm';
+  card.className = 'intent-confirm';
+  const lbl = document.createElement('span');
+  lbl.className = 'ic-lbl';
+  lbl.textContent = '你想练的是？';
+  card.appendChild(lbl);
+  alts.slice(0, 3).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'ic-opt';
+    b.textContent = a.kp_name || a.kp_id;          // 只显中文名，无裸 id（UI 红线）
+    b.onclick = () => {
+      closeIntentConfirm();
+      const inp = $('#intent-input'); if (inp) inp.value = '';
+      startPractice({ kp_id: a.kp_id, name: a.kp_name || a.kp_id,
+                      difficulty: slots && slots.difficulty,
+                      qtype: slots && slots.qtype }, 'intent');
+    };
+    card.appendChild(b);
+  });
+  const cancel = document.createElement('button');
+  cancel.className = 'ic-cancel';
+  cancel.textContent = '取消';
+  cancel.onclick = closeIntentConfirm;
+  card.appendChild(cancel);
+  bar.insertAdjacentElement('afterend', card);     // 内联在意图条正下方
+  // 点卡片外任意处 → 收起回清单态（捕获阶段监听；点卡片内不触发）
+  __confirmOutside = e => { if (!card.contains(e.target)) closeIntentConfirm(); };
+  document.addEventListener('click', __confirmOutside, true);
+}
+
 async function intentGo() {
   const inp = $('#intent-input'), hint = $('#intent-hint');
   const text = (inp.value || '').trim();
   if (!text) return;
   hint.hidden = true;
+  closeIntentConfirm();
   const btn = $('#intent-go');
   btn.disabled = true; btn.textContent = '解析中…';   // 防连点 + 出题中反馈
   try {
@@ -300,6 +350,10 @@ async function intentGo() {
       return;
     }
     const sl = d.slots;
+    if (d.ambiguous && (d.alternatives || []).length > 1) {
+      showIntentConfirm(d.alternatives, sl);   // 模糊时问而不猜：先确认再出题
+      return;
+    }
     inp.value = '';
     startPractice({ kp_id: sl.kp_id, name: sl.kp_name, difficulty: sl.difficulty, qtype: sl.qtype }, 'intent');
   } catch (_) {

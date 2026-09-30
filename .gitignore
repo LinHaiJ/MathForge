@@ -16,3 +16,8 @@ profiles/
 
 _*.txt
 _*.log
+
+# 模块 K（盲评工具）：session 数据（题集/答案 key）不入 git；脚本(scripts/)与页面/README 进 git
+blind_eval/*
+!blind_eval/index.html
+!blind_eval/README.md

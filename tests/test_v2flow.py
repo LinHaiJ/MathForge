@@ -60,7 +60,13 @@ def test_full_path_wrong_to_variant_to_correct(flow):
     assert it["last_ok"] is False and it["trend_str"] == "错"
 
     # 4) 练一题 → /v2/variant：有源题 → 变式带溯源区（history + changes + consistency）
+    #    det3x3 参数空间仅 6 格：变式与母题撞参（同参数）时，作答会被服务端同题去重
+    #    拦截（stmt 摘要兜底比对）→ last_ok 翻转断言概率性失败（2026-09-28 修：重抽）。
     v = cli.post("/v2/variant", json={"kp_id": mother_kp, "qtype": "fill"}).json()
+    for _ in range(8):
+        if v.get("ok") and v["question"]["statement_md"] != q["statement_md"]:
+            break
+        v = cli.post("/v2/variant", json={"kp_id": mother_kp, "qtype": "fill"}).json()
     assert v["ok"], v
     prov = v["provenance"]
     assert prov["source_kind"] == "history" and prov["source_summary"]
