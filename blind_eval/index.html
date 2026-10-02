@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MathForge 盲评 · 2AFC + Rubric</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/contrib/auto-render.min.js"></script>
 <style>
 /* ============================================================
    MathForge 盲评工具页（模块 K）——独立极简「纸墨」风。
    本页为本地静态工具（不入 /ui2 学生端）：纯 HTML/JS/CSS 单文件，
    无框架、无构建、无 CDN；仅依赖同目录 blind.json / key.json。
-   题干按 LaTeX 源码原样展示（离线无渲染库，评测者可读）。
+   题干 LaTeX 用同目录 vendor/katex（构建时自 ui2/vendor 复制）渲染，未命中时原样展示。
    ============================================================ */
 :root {
   color-scheme: light;
@@ -182,6 +185,14 @@ var state = { blind: null, key: null, keyLoaded: false, idx: 0,
               answers: {}, session: "" };
 
 function $(s) { return document.querySelector(s); }
+function renderMath(el) {
+  if (!window.renderMathInElement) return;
+  try {
+    renderMathInElement(el, { delimiters: [
+      { left: "$$", right: "$$", display: true },
+      { left: "$", right: "$", display: false }], throwOnError: false });
+  } catch (e) { /* 渲染失败回退原文本 */ }
+}
 function esc(s) { return String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 function storageKey() { return "mfbf_" + state.session; }
@@ -221,6 +232,7 @@ function renderPair() {
   $("#ori-stmt").textContent = (p.ori.statement_md || "") +
     (p.ori.options ? "\n选项：" + p.ori.options.join("　") : "");
 
+  renderMath($("#ori-stmt"));
   ["left", "right"].forEach(function (side) {
     var el = side === "left" ? $("#card-left") : $("#card-right");
     var it = p[side];
@@ -240,7 +252,7 @@ function renderPair() {
         }).join("") + '</span></div>';
     });
     el.innerHTML = html;
-    el.classList.toggle("locked", committed);
+    renderMath(el);
     el.querySelectorAll(".score-btns button").forEach(function (b) {
       b.addEventListener("click", function () {
         if (pairCommitted(p.pair_id)) return;
@@ -336,6 +348,7 @@ function renderReveal(p, a) {
         '<div class="note">解析：' + esc(it.analysis || "—") + '</div></div>';
     });
     $("#reveal-items").innerHTML = html;
+    renderMath($("#reveal-items"));
     var v = $("#reveal-verdict");
     if (a.choice === "unsure") { v.className = "verdict unsure"; v.textContent = "你选择了「分不出」。"; }
     else if (a.choice === k.ai_side) { v.className = "verdict ok"; v.textContent = "你指认了 " +

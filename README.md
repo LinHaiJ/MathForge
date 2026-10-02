@@ -1,7 +1,7 @@
 # MathForge · 记忆驱动的数学训练 Agent
 
 > **🌐 在线体验（V2 学生端，免部署直开）：<https://mathforge.app.workbuddy.host/ui2/>**
-> 确定性模板族 23 族 / 22 个 kp 零 API 确定性出题零等待；其余考点由 DeepSeek 实时出题（首次约 3-10s）。无 key 时自动退回演示模式，只读缓存。
+> 族考点（罗尔/拉格朗日/分部积分/二重积分等 16 族）确定性出题零等待；其余考点由 DeepSeek 实时出题（首次约 3-10s）。无 key 时自动退回演示模式，只读缓存。
 
 > 做错一道题，先判出你为什么错（概念混淆/计算失误/方法选错/审题错误），再生成一道**答案经数学验证**的变式题，盯着这个错因练到会。
 > 不是题库检索，不是搜题答案机——每道 AI 题过 SymPy 验证才外推，调度规则全落盘可回放。
@@ -35,7 +35,7 @@ ui2 学生端（今日练习/足迹统计） ──► /v2/* 端点（v2api 装�
 | 路径 | 内容 |
 |---|---|
 | v2/ | **上线主线**：v2api（/v2 全端点）、mem2（事件流记忆投影）、policy2（P1-P6）、db（记忆三表，v1 退役后迁入）、assembler/router/v2intent/pack_loader |
-| packs/ | 科目包（calculus·linear·probability：kp_graph/strategy/families/SKILL），**确定性族 23 族模块 / 22 个 kp 零 API**（详见各族 docstring） |
+| packs/ | 科目包（calculus·linear·probability：kp_graph/strategy/families/SKILL），**确定性族 23 个 kp 零 API**（16 族，详见各族 docstring） |
 | ui2/ | v2 学生界面（今日练习/足迹统计 两页 + 拍照识别入口） |
 | 共用（根） | app.py（唯一装配点）、mcp_server.py（MCP stdio 工具）、generate/families/verify/attribute/llm（出题·判分·归因·LLM） |
 | tests/ + conftest.py | pytest（1003 用例全绿，2026-09-30 v1 退役后基线） |

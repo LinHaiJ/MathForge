@@ -577,6 +577,11 @@ def run_build(plan: dict, args: argparse.Namespace) -> "Path | None":
     (sdir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1),
                                         encoding="utf-8")
     shutil.copyfile(PAGE_SRC, sdir / "index.html")
+    # KaTeX 本地副本随 session 复制（页面相对路径 vendor/katex/... 渲染题干数学）；
+    # 缺失时页面自动回退纯文本展示，不阻塞构建。
+    _katex_src = _ROOT / "ui2" / "vendor" / "katex"
+    if _katex_src.is_dir():
+        shutil.copytree(_katex_src, sdir / "vendor" / "katex", dirs_exist_ok=True)
 
     print("-" * 72)
     print(f"[盲评] 完成：{len(blind_pairs)} 对（跳过 {len(skipped)}），session={session}")
